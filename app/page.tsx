@@ -62,14 +62,10 @@ function createRandomOrderMap(artists: Artist[]) {
 }
 
 function pickHeroDecorations(artists: Artist[]): HeroDecoration[] {
-  const fixedAds = [...artists]
-    .filter((artist) => artist.is_ad && artist.character_url.trim())
-    .sort((a, b) => a.sort_order - b.sort_order)
+  const selected = [...artists]
+    .filter((artist) => artist.character_url.trim())
+    .sort(() => Math.random() - 0.5)
     .slice(0, 4);
-
-  const randomPool = artists.filter((artist) => artist.character_url.trim());
-  const randomFallback = [...randomPool].sort(() => Math.random() - 0.5).slice(0, 4);
-  const selected = (fixedAds.length > 0 ? fixedAds : randomFallback).slice(0, 4);
 
   return selected.map((artist, index) => ({
     artist,
