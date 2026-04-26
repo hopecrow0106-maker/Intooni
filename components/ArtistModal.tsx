@@ -76,7 +76,7 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
         </button>
 
         <div className="grid h-full overflow-y-auto md:grid-cols-[0.92fr_1.08fr]">
-          <div className="flex flex-col justify-between gap-6 border-b border-[rgba(0,0,0,0.08)] p-5 md:border-b-0 md:border-r md:p-8">
+          <div className="flex flex-col gap-6 border-b border-[rgba(0,0,0,0.08)] p-5 md:justify-between md:border-b-0 md:border-r md:p-8">
             <div className="space-y-5">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-3">
@@ -133,7 +133,7 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
             </TrackedArtistActionLink>
           </div>
 
-          <div className="space-y-4 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-4 p-4 md:overflow-y-auto md:p-6">
             {galleryPostUrls.length > 0 ? (
               galleryPostUrls.map((url, index) => (
                 <div key={`${artist.id}-${index}`} className="space-y-3">
@@ -162,4 +162,3 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
     </div>
   );
 }
-
