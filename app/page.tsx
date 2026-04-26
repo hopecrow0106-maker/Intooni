@@ -545,11 +545,9 @@ export default function HomePage() {
 
             {/* ① 왼쪽 끝 · 위 (작은, md+) */}
             {heroDecorations[1] && (
-              <a
-                href={`https://instagram.com/${heroDecorations[1].artist.instagram_handle.replace(/^@/, "")}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => trackArtistEvent(heroDecorations[1].artist.id, "hero_click")}
+              <button
+                type="button"
+                onClick={() => openArtistModal(heroDecorations[1].artist, "hero_click")}
                 className="absolute left-0 top-3 z-10 hidden md:block"
                 style={
                   {
@@ -569,16 +567,14 @@ export default function HomePage() {
                   height={130}
                   className="h-[90px] w-[90px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.13)] md:h-[110px] md:w-[110px] lg:h-[130px] lg:w-[130px]"
                 />
-              </a>
+              </button>
             )}
 
             {/* ② 왼쪽 안쪽 · 아래 (큰) — 왼쪽에서 10% 안으로 */}
             {heroDecorations[0] && (
-              <a
-                href={`https://instagram.com/${heroDecorations[0].artist.instagram_handle.replace(/^@/, "")}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => trackArtistEvent(heroDecorations[0].artist.id, "hero_click")}
+              <button
+                type="button"
+                onClick={() => openArtistModal(heroDecorations[0].artist, "hero_click")}
                 className="absolute bottom-2 z-10"
                 style={
                   {
@@ -599,16 +595,14 @@ export default function HomePage() {
                   height={195}
                   className="h-[120px] w-[120px] object-contain drop-shadow-[0_16px_26px_rgba(0,0,0,0.15)] md:h-[160px] md:w-[160px] lg:h-[195px] lg:w-[195px]"
                 />
-              </a>
+              </button>
             )}
 
             {/* ③ 오른쪽 안쪽 · 위 (큰) — 오른쪽에서 10% 안으로 */}
             {heroDecorations[2] && (
-              <a
-                href={`https://instagram.com/${heroDecorations[2].artist.instagram_handle.replace(/^@/, "")}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => trackArtistEvent(heroDecorations[2].artist.id, "hero_click")}
+              <button
+                type="button"
+                onClick={() => openArtistModal(heroDecorations[2].artist, "hero_click")}
                 className="absolute top-3 z-10"
                 style={
                   {
@@ -629,16 +623,14 @@ export default function HomePage() {
                   height={205}
                   className="h-[130px] w-[130px] object-contain drop-shadow-[0_16px_26px_rgba(0,0,0,0.15)] md:h-[165px] md:w-[165px] lg:h-[205px] lg:w-[205px]"
                 />
-              </a>
+              </button>
             )}
 
             {/* ④ 오른쪽 끝 · 아래 (작은, md+) */}
             {heroDecorations[3] && (
-              <a
-                href={`https://instagram.com/${heroDecorations[3].artist.instagram_handle.replace(/^@/, "")}`}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => trackArtistEvent(heroDecorations[3].artist.id, "hero_click")}
+              <button
+                type="button"
+                onClick={() => openArtistModal(heroDecorations[3].artist, "hero_click")}
                 className="absolute bottom-3 right-0 z-10 hidden md:block"
                 style={
                   {
@@ -658,7 +650,7 @@ export default function HomePage() {
                   height={120}
                   className="h-[85px] w-[85px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.13)] md:h-[100px] md:w-[100px] lg:h-[120px] lg:w-[120px]"
                 />
-              </a>
+              </button>
             )}
 
             <div className="relative z-20">
