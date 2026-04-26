@@ -270,7 +270,11 @@ export default function HomePage() {
           supabase.from("categories").select("*").order("sort_order", { ascending: true }),
           supabase.from("artists").select("id, genre"),
           supabase.from("magazines").select("*").order("published_at", { ascending: false }),
-          supabase.from("artists").select("*").order("is_ad", { ascending: false }).order("sort_order", { ascending: true }).limit(16),
+          supabase
+            .from("artists")
+            .select("*")
+            .not("character_url", "eq", "")
+            .order("sort_order", { ascending: true }),
           supabase.from("artists").select("*").eq("is_hot", true).order("sort_order", { ascending: true }).limit(8),
           supabase.from("artists").select("*").order("created_at", { ascending: false }).limit(4)
         ]);
