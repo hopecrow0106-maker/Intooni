@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import type { Artist, Category } from "@/lib/types";
@@ -45,7 +45,7 @@ type UploadingState = {
   character: boolean;
 };
 
-const emptyGalleryPostUrls = ["", "", "", ""];
+const EMPTY_GALLERY_POST_URLS = ["", "", "", ""];
 
 function formatDateTimeLabel(value?: string) {
   if (!value) {
@@ -84,12 +84,16 @@ function createInitialState(artist: Artist | null, categories: Category[]): Arti
     thumbnail_url: artist?.thumbnail_url ?? "",
     character_url: artist?.character_url ?? "",
     gallery_post_urls: artist?.gallery_post_urls.length
-      ? [...artist.gallery_post_urls, ...emptyGalleryPostUrls].slice(0, 4)
-      : [...emptyGalleryPostUrls],
+      ? [...artist.gallery_post_urls, ...EMPTY_GALLERY_POST_URLS].slice(0, 4)
+      : [...EMPTY_GALLERY_POST_URLS],
     is_ad: artist?.is_ad ?? false,
     is_hot: artist?.is_hot ?? false,
     sort_order: artist?.sort_order ?? 0
   };
+}
+
+function isKoreanComposing(event: ReactKeyboardEvent<HTMLInputElement>) {
+  return event.nativeEvent.isComposing || event.keyCode === 229;
 }
 
 export function ArtistForm({
@@ -126,10 +130,7 @@ export function ArtistForm({
     setTopicTagInput("");
     setTargetAudienceTagInput("");
     setFormMessage("");
-    setUploading({
-      thumbnail: false,
-      character: false
-    });
+    setUploading({ thumbnail: false, character: false });
   }, [categories, initialArtist, isOpen]);
 
   useEffect(() => {
@@ -181,7 +182,7 @@ export function ArtistForm({
       const publicUrl = await uploadFile(file, "artists");
       setForm((current) => ({ ...current, thumbnail_url: publicUrl }));
     } catch (error) {
-      setFormMessage(error instanceof Error ? error.message : "대표 썸네일 업로드에 실패했습니다.");
+      setFormMessage(error instanceof Error ? error.message : "썸네일 업로드에 실패했습니다.");
     } finally {
       setUploading((current) => ({ ...current, thumbnail: false }));
     }
@@ -198,7 +199,7 @@ export function ArtistForm({
       const publicUrl = await uploadFile(file, "characters");
       setForm((current) => ({ ...current, character_url: publicUrl }));
     } catch (error) {
-      setFormMessage(error instanceof Error ? error.message : "캐릭터 이미지 업로드에 실패했습니다.");
+      setFormMessage(error instanceof Error ? error.message : "누끼 이미지 업로드에 실패했습니다.");
     } finally {
       setUploading((current) => ({ ...current, character: false }));
     }
@@ -211,12 +212,12 @@ export function ArtistForm({
     }
 
     const withHash = normalized.startsWith("#") ? normalized : `#${normalized}`;
-    if (!form.hashtags.includes(withHash)) {
-      setForm((current) => ({
-        ...current,
-        hashtags: [...current.hashtags, withHash]
-      }));
-    }
+    setForm((current) => ({
+      ...current,
+      hashtags: current.hashtags.includes(withHash)
+        ? current.hashtags
+        : [...current.hashtags, withHash]
+    }));
     setTagInput("");
   };
 
@@ -226,12 +227,12 @@ export function ArtistForm({
       return;
     }
 
-    if (!form.hidden_tags.includes(normalized)) {
-      setForm((current) => ({
-        ...current,
-        hidden_tags: [...current.hidden_tags, normalized]
-      }));
-    }
+    setForm((current) => ({
+      ...current,
+      hidden_tags: current.hidden_tags.includes(normalized)
+        ? current.hidden_tags
+        : [...current.hidden_tags, normalized]
+    }));
     setHiddenTagInput("");
   };
 
@@ -310,12 +311,11 @@ export function ArtistForm({
         throw new Error(data.message ?? "카테고리 삭제에 실패했습니다.");
       }
 
+      const fallbackGenre = categories.find((item) => item.id !== category.id)?.name ?? "";
       await onCategoriesChanged();
+
       if (form.genre === category.name) {
-        setForm((current) => ({
-          ...current,
-          genre: categories.find((item) => item.id !== category.id)?.name ?? ""
-        }));
+        setForm((current) => ({ ...current, genre: fallbackGenre }));
       }
     } catch (error) {
       setFormMessage(error instanceof Error ? error.message : "카테고리 삭제에 실패했습니다.");
@@ -323,6 +323,41 @@ export function ArtistForm({
       setCategoryBusy(false);
     }
   };
+
+  const tagSections = [
+    {
+      label: "그림체 태그",
+      helper: "예: 흑백, 파스텔, 캐릭터중심, 단순한그림체",
+      value: styleTagInput,
+      setValue: setStyleTagInput,
+      field: "style_tags" as const,
+      tags: form.style_tags
+    },
+    {
+      label: "분위기 태그",
+      helper: "예: 공감, 위로, 병맛, 몰입감",
+      value: moodTagInput,
+      setValue: setMoodTagInput,
+      field: "mood_tags" as const,
+      tags: form.mood_tags
+    },
+    {
+      label: "주제 태그",
+      helper: "예: 자취, 직장인, 대학생, 고양이",
+      value: topicTagInput,
+      setValue: setTopicTagInput,
+      field: "topic_tags" as const,
+      tags: form.topic_tags
+    },
+    {
+      label: "독자층 태그",
+      helper: "예: 20대, 직장인, 여성향, 부모",
+      value: targetAudienceTagInput,
+      setValue: setTargetAudienceTagInput,
+      field: "target_audience_tags" as const,
+      tags: form.target_audience_tags
+    }
+  ];
 
   return (
     <div className="fixed inset-0 z-50 bg-ink/50" onClick={onClose}>
@@ -354,16 +389,21 @@ export function ArtistForm({
             await onSave({
               ...form,
               instagram_handle: form.instagram_handle.replace(/^@/, ""),
+              hashtags: form.hashtags.map((tag) => tag.trim()).filter(Boolean),
               hidden_tags: form.hidden_tags.map((tag) => tag.trim()).filter(Boolean),
+              style_tags: form.style_tags.map((tag) => tag.trim()).filter(Boolean),
+              mood_tags: form.mood_tags.map((tag) => tag.trim()).filter(Boolean),
+              topic_tags: form.topic_tags.map((tag) => tag.trim()).filter(Boolean),
+              target_audience_tags: form.target_audience_tags.map((tag) => tag.trim()).filter(Boolean),
               gallery_post_urls: form.gallery_post_urls.map((url) => url.trim()).filter(Boolean)
             });
           }}
         >
-          {formMessage && (
+          {formMessage ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {formMessage}
             </div>
-          )}
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
@@ -375,6 +415,7 @@ export function ArtistForm({
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
               />
             </label>
+
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-600">인스타 계정</span>
               <input
@@ -389,6 +430,9 @@ export function ArtistForm({
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
               />
             </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-600">요즘 뜨는 작가</span>
               <button
@@ -397,6 +441,17 @@ export function ArtistForm({
                 className={`switch-track ${form.is_hot ? "bg-coral" : "bg-slate-300"}`}
               >
                 <span className={`switch-thumb ${form.is_hot ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-600">AD 상단 노출</span>
+              <button
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, is_ad: !current.is_ad }))}
+                className={`switch-track ${form.is_ad ? "bg-coral" : "bg-slate-300"}`}
+              >
+                <span className={`switch-thumb ${form.is_ad ? "translate-x-6" : "translate-x-1"}`} />
               </button>
             </label>
           </div>
@@ -420,22 +475,12 @@ export function ArtistForm({
                 )}
               </select>
             </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">AD 상단 노출</span>
-              <button
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, is_ad: !current.is_ad }))}
-                className={`switch-track ${form.is_ad ? "bg-coral" : "bg-slate-300"}`}
-              >
-                <span className={`switch-thumb ${form.is_ad ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </label>
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-700">카테고리 관리</span>
-              {categoryBusy && <span className="text-xs text-slate-400">처리 중...</span>}
+              {categoryBusy ? <span className="text-xs text-slate-400">처리 중...</span> : null}
             </div>
             <div className="flex gap-2">
               <input
@@ -451,7 +496,7 @@ export function ArtistForm({
               >
                 {editingCategoryId ? "수정" : "추가"}
               </button>
-              {editingCategoryId && (
+              {editingCategoryId ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -462,7 +507,7 @@ export function ArtistForm({
                 >
                   취소
                 </button>
-              )}
+              ) : null}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {categories.map((category) => (
@@ -540,7 +585,7 @@ export function ArtistForm({
             <textarea
               value={form.memo}
               onChange={(event) => setForm((current) => ({ ...current, memo: event.target.value }))}
-              placeholder="작가에 대한 짧은 소개나 메모를 입력하세요"
+              placeholder="작가 소개나 검색에 도움이 될 메모를 입력해주세요"
               rows={4}
               className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
             />
@@ -557,40 +602,7 @@ export function ArtistForm({
             />
           </label>
 
-          {[
-            {
-              label: "그림체 태그",
-              helper: "예: 흑백, 파스텔, 캐릭터중심, 단순한그림체",
-              value: styleTagInput,
-              setValue: setStyleTagInput,
-              field: "style_tags" as const,
-              tags: form.style_tags
-            },
-            {
-              label: "분위기 태그",
-              helper: "예: 공감, 위로, 병맛, 몰입감",
-              value: moodTagInput,
-              setValue: setMoodTagInput,
-              field: "mood_tags" as const,
-              tags: form.mood_tags
-            },
-            {
-              label: "주제 태그",
-              helper: "예: 자취, 직장인, 대학생, 고양이",
-              value: topicTagInput,
-              setValue: setTopicTagInput,
-              field: "topic_tags" as const,
-              tags: form.topic_tags
-            },
-            {
-              label: "독자층 태그",
-              helper: "예: 20대, 직장인, 여성향, 부모",
-              value: targetAudienceTagInput,
-              setValue: setTargetAudienceTagInput,
-              field: "target_audience_tags" as const,
-              tags: form.target_audience_tags
-            }
-          ].map((section) => (
+          {tagSections.map((section) => (
             <div key={section.field} className="space-y-3">
               <div className="space-y-1">
                 <span className="text-sm font-medium text-slate-600">{section.label}</span>
@@ -601,6 +613,10 @@ export function ArtistForm({
                   value={section.value}
                   onChange={(event) => section.setValue(event.target.value)}
                   onKeyDown={(event) => {
+                    if (isKoreanComposing(event)) {
+                      return;
+                    }
+
                     if (event.key === "Enter") {
                       event.preventDefault();
                       addTagToField(section.field, section.value, () => section.setValue(""));
@@ -632,7 +648,7 @@ export function ArtistForm({
                     }
                     className="rounded-full border border-dashed border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-500"
                   >
-                    {tag} 횞
+                    {tag} ×
                   </button>
                 ))}
               </div>
@@ -646,6 +662,10 @@ export function ArtistForm({
                 value={tagInput}
                 onChange={(event) => setTagInput(event.target.value)}
                 onKeyDown={(event) => {
+                  if (isKoreanComposing(event)) {
+                    return;
+                  }
+
                   if (event.key === "Enter") {
                     event.preventDefault();
                     addVisibleTag();
@@ -685,7 +705,7 @@ export function ArtistForm({
             <div className="space-y-1">
               <span className="text-sm font-medium text-slate-600">숨김 검색 태그</span>
               <p className="text-xs text-slate-400">
-                사용자에게는 보이지 않고 검색에만 쓰입니다. 예: 이지, 흑백, 그림 일기
+                사용자에겐 보이지 않고 검색에만 들어갑니다. 예: 이지, 흑백, 그림 일기
               </p>
             </div>
             <div className="flex gap-2">
@@ -693,6 +713,10 @@ export function ArtistForm({
                 value={hiddenTagInput}
                 onChange={(event) => setHiddenTagInput(event.target.value)}
                 onKeyDown={(event) => {
+                  if (isKoreanComposing(event)) {
+                    return;
+                  }
+
                   if (event.key === "Enter") {
                     event.preventDefault();
                     addHiddenTag();
@@ -733,15 +757,23 @@ export function ArtistForm({
             <div className="grid gap-4 md:grid-cols-[180px_1fr]">
               <div className="relative aspect-square overflow-hidden rounded-[24px] border border-dashed border-slate-200 bg-slate-50">
                 {form.thumbnail_url ? (
-                  <Image src={form.thumbnail_url} alt="대표 썸네일" fill className="object-cover" sizes="180px" />
+                  <Image
+                    src={form.thumbnail_url}
+                    alt="대표 썸네일"
+                    fill
+                    className="object-cover"
+                    sizes="180px"
+                  />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-slate-400">이미지 없음</div>
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    이미지 없음
+                  </div>
                 )}
-                {uploading.thumbnail && (
+                {uploading.thumbnail ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-semibold text-ink">
                     업로드 중...
                   </div>
-                )}
+                ) : null}
               </div>
               <label className="flex cursor-pointer items-center justify-center rounded-[24px] border border-slate-200 bg-white px-4 py-6 text-sm font-medium text-slate-600">
                 썸네일 업로드
@@ -766,23 +798,33 @@ export function ArtistForm({
           <div className="space-y-3">
             <div className="space-y-1">
               <span className="text-sm font-medium text-slate-600">캐릭터 누끼 이미지</span>
-              <p className="text-xs text-slate-400">배경 투명 PNG 권장 / 없으면 히어로에 노출되지 않음</p>
+              <p className="text-xs text-slate-400">
+                배경 투명 PNG 권장 / 없으면 히어로에 노출되지 않음
+              </p>
             </div>
             <div className="grid gap-4 md:grid-cols-[180px_1fr]">
               <div className="relative aspect-square overflow-hidden rounded-[24px] border border-dashed border-slate-200 bg-slate-50">
                 {form.character_url ? (
-                  <Image src={form.character_url} alt="캐릭터 이미지" fill className="object-contain p-3" sizes="180px" />
+                  <Image
+                    src={form.character_url}
+                    alt="캐릭터 누끼"
+                    fill
+                    className="object-contain p-3"
+                    sizes="180px"
+                  />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-slate-400">이미지 없음</div>
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    이미지 없음
+                  </div>
                 )}
-                {uploading.character && (
+                {uploading.character ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-semibold text-ink">
                     업로드 중...
                   </div>
-                )}
+                ) : null}
               </div>
               <label className="flex cursor-pointer items-center justify-center rounded-[24px] border border-slate-200 bg-white px-4 py-6 text-sm font-medium text-slate-600">
-                캐릭터 이미지 업로드
+                누끼 이미지 업로드
                 <input
                   type="file"
                   accept="image/png,image/webp,image/*"
@@ -807,7 +849,9 @@ export function ArtistForm({
               {[0, 1, 2, 3].map((index) => (
                 <div key={index} className="space-y-3 rounded-[24px] border border-slate-200 bg-white p-4">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-600">갤러리 게시물 링크 {index + 1}</span>
+                    <span className="text-sm font-medium text-slate-600">
+                      갤러리 게시물 링크 {index + 1}
+                    </span>
                     <input
                       value={form.gallery_post_urls[index]}
                       onChange={(event) => updateGalleryPostUrlAt(index, event.target.value)}
