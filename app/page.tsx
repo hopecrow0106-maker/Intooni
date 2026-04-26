@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import {
   FilterBar,
@@ -16,8 +16,6 @@ import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/plac
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { Artist, Category, Magazine } from "@/lib/types";
 
-const INITIAL_ARTIST_BATCH = 12;
-const ARTIST_BATCH_SIZE = 12;
 const INQUIRY_MESSAGE = "jaamstudio@naver.com 로 연락주세요!";
 const HERO_DELAYS = ["0s", "0.7s", "0.3s", "1s"] as const;
 
@@ -169,7 +167,7 @@ function NewArtistGridCard({
 
 export default function HomePage() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
-  const [paginatedArtists, setPaginatedArtists] = useState<Artist[]>([]);
+  const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [searchArtists, setSearchArtists] = useState<Artist[] | null>(null);
   const [artistRandomOrder, setArtistRandomOrder] = useState<Record<string, number>>({});
   const [artistCount, setArtistCount] = useState(0);
@@ -188,8 +186,7 @@ export default function HomePage() {
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [typedInquiryText, setTypedInquiryText] = useState("");
-  const [pageIndex, setPageIndex] = useState(0);
-  const [hasMoreArtists, setHasMoreArtists] = useState(true);
+  const hasMoreArtists = false;
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastLoggedSearchRef = useRef("");
 
@@ -211,49 +208,6 @@ export default function HomePage() {
     setSelectedArtist(artist);
   };
 
-  const loadPaginatedArtists = useCallback(async (nextPage: number, reset = false) => {
-    if (!supabase) {
-      return;
-    }
-
-    const from = nextPage * ARTIST_BATCH_SIZE;
-    const to = from + ARTIST_BATCH_SIZE - 1;
-
-    const { data, error, count } = await supabase
-      .from("artists")
-      .select("*", { count: "exact" })
-      .order("is_ad", { ascending: false })
-      .order("sort_order", { ascending: true })
-      .range(from, to);
-
-    if (error) {
-      throw error;
-    }
-
-    const nextArtists = data ?? [];
-
-    setArtistCount(count ?? 0);
-    setPaginatedArtists((current) => {
-      const merged = reset ? nextArtists : [...current, ...nextArtists];
-      setArtistRandomOrder((prev) => {
-        const nextMap = reset ? {} : { ...prev };
-        const startIndex = Object.keys(nextMap).length;
-        [...nextArtists]
-          .sort(() => Math.random() - 0.5)
-          .forEach((artist, index) => {
-            if (nextMap[artist.id] === undefined) {
-              nextMap[artist.id] = startIndex + index;
-            }
-          });
-        return nextMap;
-      });
-      return merged;
-    });
-
-    setHasMoreArtists(nextArtists.length === ARTIST_BATCH_SIZE && (count ?? 0) > to + 1);
-    setPageIndex(nextPage);
-  }, [supabase]);
-
   useEffect(() => {
     let mounted = true;
 
@@ -265,7 +219,7 @@ export default function HomePage() {
         return;
       }
 
-      const [categoriesResponse, genreResponse, magazinesResponse, heroResponse, hotResponse, newResponse] =
+      const [categoriesResponse, genreResponse, magazinesResponse, artistsResponse, hotResponse, newResponse] =
         await Promise.all([
           supabase.from("categories").select("*").order("sort_order", { ascending: true }),
           supabase.from("artists").select("id, genre"),
@@ -273,7 +227,7 @@ export default function HomePage() {
           supabase
             .from("artists")
             .select("*")
-            .not("character_url", "eq", "")
+            .order("is_ad", { ascending: false })
             .order("sort_order", { ascending: true }),
           supabase.from("artists").select("*").eq("is_hot", true).order("sort_order", { ascending: true }).limit(8),
           supabase.from("artists").select("*").order("created_at", { ascending: false }).limit(4)
@@ -294,19 +248,17 @@ export default function HomePage() {
       setGenreCounts(counts);
       setMagazines(magazinesResponse.error ? [] : (magazinesResponse.data ?? []));
 
-      const heroArtists = heroResponse.error ? [] : (heroResponse.data ?? []);
-      setHeroDecorations(pickHeroDecorations(heroArtists));
+      const nextArtists = artistsResponse.error ? [] : (artistsResponse.data ?? []);
+      setAllArtists(nextArtists);
+      setArtistCount(nextArtists.length);
+      setArtistRandomOrder(createRandomOrderMap(nextArtists));
+      setHeroDecorations(pickHeroDecorations(nextArtists));
 
       const hotArtists = hotResponse.error ? [] : (hotResponse.data ?? []);
       setFeaturedHotArtists(hotArtists);
 
       const newArtists = newResponse.error ? [] : (newResponse.data ?? []);
       setFeaturedNewArtists([...newArtists].sort(() => Math.random() - 0.5));
-
-      await loadPaginatedArtists(0, true);
-      if (!mounted) {
-        return;
-      }
 
       setLoading(false);
     };
@@ -316,7 +268,7 @@ export default function HomePage() {
     return () => {
       mounted = false;
     };
-  }, [loadPaginatedArtists, supabase]);
+  }, [supabase]);
 
   useEffect(() => {
     if (!showInquiryModal) {
@@ -422,7 +374,7 @@ export default function HomePage() {
   const featuredMagazines = useMemo(() => magazines.slice(0, 3), [magazines]);
 
   const filteredArtists = useMemo(() => {
-    const baseArtists = isSearching ? searchArtists ?? [] : paginatedArtists;
+    const baseArtists = isSearching ? searchArtists ?? [] : allArtists;
     const query = search.trim().toLowerCase();
 
     return [...baseArtists]
@@ -456,7 +408,7 @@ export default function HomePage() {
 
         return matchSearch && matchGenre && matchFollower;
       });
-  }, [activeFollowerRanges, activeGenres, artistRandomOrder, isSearching, paginatedArtists, search, searchArtists]);
+  }, [activeFollowerRanges, activeGenres, allArtists, artistRandomOrder, isSearching, search, searchArtists]);
 
   const gridTitle = useMemo(() => {
     if (search.trim()) {
@@ -490,30 +442,6 @@ export default function HomePage() {
       ),
     [visibleArtists]
   );
-
-  useEffect(() => {
-    const target = loadMoreRef.current;
-
-    if (!target || loading || searchLoading || isSearching || !hasMoreArtists) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (!entry?.isIntersecting) {
-          return;
-        }
-
-        void loadPaginatedArtists(pageIndex + 1);
-      },
-      { rootMargin: "240px 0px" }
-    );
-
-    observer.observe(target);
-
-    return () => observer.disconnect();
-  }, [hasMoreArtists, isSearching, loadPaginatedArtists, loading, pageIndex, searchLoading]);
 
   const visibleCountLabel = isSearching ? filteredArtists.length : artistCount;
   const showLoadingState = loading || searchLoading;
