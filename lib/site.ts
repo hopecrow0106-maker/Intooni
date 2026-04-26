@@ -14,4 +14,3 @@ export function getSiteUrl() {
 
   return "http://localhost:3000";
 }
-

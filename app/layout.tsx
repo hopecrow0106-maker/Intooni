@@ -16,12 +16,14 @@ const notoKr = Noto_Sans_KR({
   variable: "--font-kr"
 });
 
-const defaultTitle = `${SITE_NAME} | 인스타툰 디렉토리`;
+const siteUrl = getSiteUrl();
+const ogImageUrl = `${siteUrl}/og-home.png`;
+const defaultTitle = `${SITE_NAME} | 모든 인스타툰, 한 곳에서 발견하세요`;
 const defaultDescription =
-  "인스타툰 작가를 해시태그와 카테고리로 쉽게 찾고, 매거진으로 새 작가를 발견하는 인스타툰 디렉토리 서비스.";
+  "그 계정 뭐였지..? 아이디가 안 떠올라도 떠오르는 키워드로 찾아봐요!";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(getSiteUrl()),
+  metadataBase: new URL(siteUrl),
   title: defaultTitle,
   description: defaultDescription,
   applicationName: SITE_NAME,
@@ -29,22 +31,35 @@ export const metadata: Metadata = {
     "인투니",
     "인스타툰",
     "인스타툰 디렉토리",
-    "웹툰 작가",
+    "인스타툰 찾기",
+    "인스타툰 찾는 법",
     "인스타툰 추천",
-    "툰 작가 검색"
+    "썰툰",
+    "육아툰",
+    "직장툰",
+    "연애툰"
   ],
   openGraph: {
     type: "website",
     locale: "ko_KR",
-    url: "/",
+    url: siteUrl,
     siteName: SITE_NAME,
     title: defaultTitle,
-    description: defaultDescription
+    description: defaultDescription,
+    images: [
+      {
+        url: ogImageUrl,
+        width: 1200,
+        height: 630,
+        alt: "인투니 공유 이미지"
+      }
+    ]
   },
   twitter: {
     card: "summary_large_image",
     title: defaultTitle,
-    description: defaultDescription
+    description: defaultDescription,
+    images: [ogImageUrl]
   }
 };
 
@@ -67,4 +82,3 @@ export default function RootLayout({
     </html>
   );
 }
-
