@@ -128,17 +128,6 @@ create table if not exists public.artist_toonbti_option_links (
   primary key (artist_id, option_id)
 );
 
-insert into public.categories (name, sort_order)
-values
-  ('썰툰', 0),
-  ('일상툰', 1),
-  ('육아툰', 2),
-  ('연애툰', 3),
-  ('직장툰', 4),
-  ('공포툰', 5),
-  ('감성툰', 6)
-on conflict (name) do nothing;
-
 create index if not exists artists_sort_order_idx on public.artists (is_ad desc, sort_order asc);
 create index if not exists artists_name_idx on public.artists (name);
 create index if not exists artists_genre_idx on public.artists (genre);
