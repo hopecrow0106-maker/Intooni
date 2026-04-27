@@ -9,17 +9,18 @@ export type Artist = {
   post_count: number;
   hashtags: string[];
   hidden_tags: string[];
+  mood_tags: string[];
+  episode_formats: string[];
+  style_tags: string[];
+  topic_tags: string[];
   memo: string;
   bio: string;
-  style_tags: string[];
-  mood_tags: string[];
-  topic_tags: string[];
-  target_audience_tags: string[];
   thumbnail_url: string;
   character_url: string;
   gallery_post_urls: string[];
   is_ad: boolean;
   is_hot: boolean;
+  hide_from_new: boolean;
   sort_order: number;
   last_stats_updated_at: string;
   created_at: string;
@@ -68,6 +69,49 @@ export type SearchQueryLog = {
   created_at: string;
 };
 
+export type ToonbtiQuestionGroup = {
+  id: string;
+  key: string;
+  label: string;
+  description: string;
+  selection_mode: "single" | "multi";
+  max_selections: number;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type ToonbtiQuestionGroupInsert = Omit<ToonbtiQuestionGroup, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type ToonbtiQuestionOption = {
+  id: string;
+  group_id: string;
+  key: string;
+  label: string;
+  description: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type ToonbtiQuestionOptionInsert = Omit<ToonbtiQuestionOption, "id" | "created_at"> & {
+  id?: string;
+  created_at?: string;
+};
+
+export type ArtistToonbtiOptionLink = {
+  artist_id: string;
+  option_id: string;
+  created_at: string;
+};
+
+export type ArtistToonbtiOptionLinkInsert = Omit<ArtistToonbtiOptionLink, "created_at"> & {
+  created_at?: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -105,6 +149,24 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<SearchQueryLog>;
+        Relationships: [];
+      };
+      toonbti_question_groups: {
+        Row: ToonbtiQuestionGroup;
+        Insert: ToonbtiQuestionGroupInsert;
+        Update: Partial<ToonbtiQuestionGroupInsert>;
+        Relationships: [];
+      };
+      toonbti_question_options: {
+        Row: ToonbtiQuestionOption;
+        Insert: ToonbtiQuestionOptionInsert;
+        Update: Partial<ToonbtiQuestionOptionInsert>;
+        Relationships: [];
+      };
+      artist_toonbti_option_links: {
+        Row: ArtistToonbtiOptionLink;
+        Insert: ArtistToonbtiOptionLinkInsert;
+        Update: Partial<ArtistToonbtiOptionLinkInsert>;
         Relationships: [];
       };
     };

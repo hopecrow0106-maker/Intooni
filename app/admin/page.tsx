@@ -333,6 +333,9 @@ export default function AdminPage() {
   const [artistStats, setArtistStats] = useState<Record<string, ArtistStatsSummary>>({});
   const [searchQueries, setSearchQueries] = useState<SearchQuerySummary[]>([]);
   const [statsPeriod, setStatsPeriod] = useState<ArtistStatsPeriod>("all");
+  const [artistSearch, setArtistSearch] = useState("");
+  const [showAllArtistStats, setShowAllArtistStats] = useState(false);
+  const [showAllSearchQueries, setShowAllSearchQueries] = useState(false);
 
   const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -698,6 +701,30 @@ export default function AdminPage() {
     [artists]
   );
 
+  const filteredSortedArtists = useMemo(() => {
+    const query = artistSearch.trim().toLowerCase();
+
+    if (!query) {
+      return sortedArtists;
+    }
+
+    return sortedArtists.filter((artist) => {
+      const searchable = [
+        artist.name,
+        artist.instagram_handle,
+        artist.genre,
+        artist.memo,
+        artist.bio,
+        ...artist.hashtags,
+        ...artist.hidden_tags
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }, [artistSearch, sortedArtists]);
+
   const sortedMagazines = useMemo(
     () =>
       [...magazines].sort(
@@ -707,7 +734,7 @@ export default function AdminPage() {
     [magazines]
   );
 
-  const artistChartItems = useMemo<ArtistChartItem[]>(() => {
+  const allArtistChartItems = useMemo<ArtistChartItem[]>(() => {
     return sortedArtists
       .map((artist) => {
         const stats = artistStats[artist.id];
@@ -740,16 +767,23 @@ export default function AdminPage() {
         };
       })
       .filter((item) => item.total > 0)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 8);
+      .sort((a, b) => b.total - a.total);
   }, [artistStats, sortedArtists]);
 
-  const totalArtistInteractions = useMemo(
-    () => artistChartItems.reduce((sum, item) => sum + item.total, 0),
-    [artistChartItems]
+  const artistChartItems = useMemo(
+    () => allArtistChartItems.slice(0, showAllArtistStats ? allArtistChartItems.length : 8),
+    [allArtistChartItems, showAllArtistStats]
   );
 
-  const topSearchQueries = useMemo(() => searchQueries.slice(0, 10), [searchQueries]);
+  const totalArtistInteractions = useMemo(
+    () => allArtistChartItems.reduce((sum, item) => sum + item.total, 0),
+    [allArtistChartItems]
+  );
+
+  const topSearchQueries = useMemo(
+    () => searchQueries.slice(0, showAllSearchQueries ? searchQueries.length : 10),
+    [searchQueries, showAllSearchQueries]
+  );
 
   const magazineChartItems = useMemo<MagazineChartItem[]>(
     () =>
@@ -825,7 +859,8 @@ export default function AdminPage() {
 
       {activeTab === "artists" ? (
         <>
-          <section className="mt-4 flex flex-wrap gap-2">
+          <section className="mt-4 flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2">
             {([
               ["all", "전체"],
               ["year", "1년"],
@@ -841,10 +876,28 @@ export default function AdminPage() {
                 {label} 통계
               </button>
             ))}
+            </div>
+
+            <div className="max-w-md">
+              <input
+                value={artistSearch}
+                onChange={(event) => setArtistSearch(event.target.value)}
+                placeholder="작가명, 인스타 계정, 카테고리, 태그로 검색"
+                className="w-full rounded-full border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ink"
+              />
+            </div>
           </section>
 
           <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatsCard label="전체 작가" value={formatNumber(sortedArtists.length)} />
+            <StatsCard
+              label="전체 작가"
+              value={formatNumber(filteredSortedArtists.length)}
+              helper={
+                artistSearch.trim()
+                  ? `전체 ${formatNumber(sortedArtists.length)}명 중 검색 결과`
+                  : undefined
+              }
+            />
             <StatsCard
               label={`${getStatsPeriodLabel(statsPeriod)} 총 반응`}
               value={formatNumber(totalArtistInteractions)}
@@ -862,6 +915,17 @@ export default function AdminPage() {
 
           <section className="mt-6">
             <ArtistStatsChart items={artistChartItems} period={statsPeriod} />
+            {allArtistChartItems.length > 8 ? (
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowAllArtistStats((current) => !current)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-ink hover:text-ink"
+                >
+                  {showAllArtistStats ? "접기" : "펼쳐보기"}
+                </button>
+              </div>
+            ) : null}
           </section>
 
           <section className="mt-6 panel-surface p-5">
@@ -906,6 +970,18 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+
+            {searchQueries.length > 10 ? (
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowAllSearchQueries((current) => !current)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-ink hover:text-ink"
+                >
+                  {showAllSearchQueries ? "접기" : "펼쳐보기"}
+                </button>
+              </div>
+            ) : null}
           </section>
         </>
       ) : (
@@ -976,7 +1052,7 @@ export default function AdminPage() {
           </div>
         ) : activeTab === "artists" ? (
           <ArtistTable
-            artists={sortedArtists}
+            artists={filteredSortedArtists}
             statsByArtistId={artistStats}
             statsPeriod={statsPeriod}
             onEdit={(artist) => {

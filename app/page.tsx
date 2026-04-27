@@ -176,7 +176,6 @@ export default function HomePage() {
   const [magazines, setMagazines] = useState<Magazine[]>([]);
   const [heroDecorations, setHeroDecorations] = useState<HeroDecoration[]>([]);
   const [featuredHotArtists, setFeaturedHotArtists] = useState<Artist[]>([]);
-  const [featuredNewArtists, setFeaturedNewArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -189,6 +188,7 @@ export default function HomePage() {
   const hasMoreArtists = false;
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastLoggedSearchRef = useRef("");
+  const searchResultsRef = useRef<HTMLElement | null>(null);
 
   const isSearching = search.trim().length > 0 || activeGenres.length > 0 || activeFollowerRanges.length > 0;
 
@@ -219,7 +219,7 @@ export default function HomePage() {
         return;
       }
 
-      const [categoriesResponse, genreResponse, magazinesResponse, artistsResponse, hotResponse, newResponse] =
+      const [categoriesResponse, genreResponse, magazinesResponse, artistsResponse, hotResponse] =
         await Promise.all([
           supabase.from("categories").select("*").order("sort_order", { ascending: true }),
           supabase.from("artists").select("id, genre"),
@@ -229,8 +229,7 @@ export default function HomePage() {
             .select("*")
             .order("is_ad", { ascending: false })
             .order("sort_order", { ascending: true }),
-          supabase.from("artists").select("*").eq("is_hot", true).order("sort_order", { ascending: true }).limit(8),
-          supabase.from("artists").select("*").order("created_at", { ascending: false }).limit(4)
+          supabase.from("artists").select("*").eq("is_hot", true).order("sort_order", { ascending: true }).limit(8)
         ]);
 
       if (!mounted) {
@@ -256,9 +255,6 @@ export default function HomePage() {
 
       const hotArtists = hotResponse.error ? [] : (hotResponse.data ?? []);
       setFeaturedHotArtists(hotArtists);
-
-      const newArtists = newResponse.error ? [] : (newResponse.data ?? []);
-      setFeaturedNewArtists([...newArtists].sort(() => Math.random() - 0.5));
 
       setLoading(false);
     };
@@ -373,6 +369,15 @@ export default function HomePage() {
 
   const featuredMagazines = useMemo(() => magazines.slice(0, 3), [magazines]);
 
+  const featuredNewArtists = useMemo(
+    () =>
+      [...allArtists]
+        .filter((artist) => !artist.hide_from_new)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 4),
+    [allArtists]
+  );
+
   const filteredArtists = useMemo(() => {
     const baseArtists = isSearching ? searchArtists ?? [] : allArtists;
     const query = search.trim().toLowerCase();
@@ -382,10 +387,6 @@ export default function HomePage() {
       .filter((artist) => {
         const visibleTags = artist.hashtags.map((tag) => tag.toLowerCase());
         const hiddenTags = artist.hidden_tags.map((tag) => tag.toLowerCase());
-        const styleTags = artist.style_tags.map((tag) => tag.toLowerCase());
-        const moodTags = artist.mood_tags.map((tag) => tag.toLowerCase());
-        const topicTags = artist.topic_tags.map((tag) => tag.toLowerCase());
-        const audienceTags = artist.target_audience_tags.map((tag) => tag.toLowerCase());
         const memo = artist.memo.toLowerCase();
         const bio = artist.bio.toLowerCase();
 
@@ -394,10 +395,6 @@ export default function HomePage() {
           artist.name.toLowerCase().includes(query) ||
           visibleTags.some((tag) => tag.includes(query)) ||
           hiddenTags.some((tag) => tag.includes(query)) ||
-          styleTags.some((tag) => tag.includes(query)) ||
-          moodTags.some((tag) => tag.includes(query)) ||
-          topicTags.some((tag) => tag.includes(query)) ||
-          audienceTags.some((tag) => tag.includes(query)) ||
           memo.includes(query) ||
           bio.includes(query);
 
@@ -426,6 +423,21 @@ export default function HomePage() {
     () => (isSearching ? filteredArtists : filteredArtists),
     [filteredArtists, isSearching]
   );
+
+  useEffect(() => {
+    if (!isSearching || loading || searchLoading || visibleArtists.length === 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      searchResultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [isSearching, loading, searchLoading, visibleArtists.length]);
 
   const regularVisibleArtists = useMemo(
     () =>
@@ -633,7 +645,7 @@ export default function HomePage() {
             />
           </section>
 
-          <div className="mx-auto mb-10 max-w-[1200px] px-5 md:px-8">
+          <div className="mx-auto mb-4 max-w-[1200px] px-5 md:px-8">
             <div
               role="button"
               tabIndex={0}
@@ -671,9 +683,6 @@ export default function HomePage() {
                 <h3 className="mb-0.5 text-[17px] font-extrabold tracking-[-0.02em] text-[#1a1a1a]">
                   인투니 작가 등록 신청
                 </h3>
-                <p className="text-sm leading-snug text-[#6b6b6b]">
-                  구글 폼으로 작가 정보를 작성해주시면 검토 후 인투니에 등록할게요
-                </p>
               </div>
               <span className="rounded-full bg-[#fff0f3] px-4 py-2 text-sm font-semibold text-[#c9153d]">
                 신청하러 가기 →
@@ -764,7 +773,7 @@ export default function HomePage() {
             </section>
           ) : null}
 
-          <div className="mx-auto max-w-[1200px] px-5 pb-20 md:px-8">
+          <section ref={searchResultsRef} className="mx-auto max-w-[1200px] px-5 pb-20 md:px-8">
             <div className="mb-5 flex items-baseline justify-between">
               <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
                 {gridTitle}
@@ -846,7 +855,7 @@ export default function HomePage() {
                 )}
               </div>
             ) : null}
-          </div>
+          </section>
         </div>
 
         <aside className="hidden xl:block">

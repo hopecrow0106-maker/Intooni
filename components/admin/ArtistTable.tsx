@@ -117,6 +117,15 @@ export function ArtistTable({
     setLocalArtists(artists);
   }, [artists]);
 
+  const openInstagramProfile = (handle: string) => {
+    const normalizedHandle = handle.replace(/^@/, "").trim();
+    if (!normalizedHandle) {
+      return;
+    }
+
+    window.open(`https://www.instagram.com/${normalizedHandle}/`, "_blank", "noopener,noreferrer");
+  };
+
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) {
       return;
@@ -147,15 +156,11 @@ export function ArtistTable({
                       className="panel-surface flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between"
                     >
                       <div className="flex items-start gap-4">
-                        <button
-                          type="button"
+                        <div
                           {...dragProvided.dragHandleProps}
-                          className="rounded-2xl bg-slate-100 px-3 py-4 text-sm font-semibold text-slate-500"
+                          className="relative h-16 w-16 cursor-grab overflow-hidden rounded-2xl bg-slate-100 active:cursor-grabbing"
+                          title="드래그해서 순서 변경"
                         >
-                          이동
-                        </button>
-
-                        <div className="relative h-16 w-16 overflow-hidden rounded-2xl bg-slate-100">
                           <Image
                             src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
                             alt={artist.name}
@@ -180,6 +185,11 @@ export function ArtistTable({
                             {isStale(artist.last_stats_updated_at) ? (
                               <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
                                 업데이트 필요
+                              </span>
+                            ) : null}
+                            {artist.hide_from_new ? (
+                              <span className="rounded-full bg-slate-200 px-2.5 py-1 font-semibold text-slate-600">
+                                NEW 제외
                               </span>
                             ) : null}
                           </div>
@@ -208,6 +218,13 @@ export function ArtistTable({
                           active={artist.is_hot}
                           onClick={() => onToggleHot(artist)}
                         />
+                        <button
+                          type="button"
+                          onClick={() => openInstagramProfile(artist.instagram_handle)}
+                          className="rounded-full border border-[#ffd0d9] bg-[#fff5f7] px-4 py-2 text-sm font-semibold text-[#c9153d] transition hover:border-[#ff8ea5] hover:bg-[#fff0f3]"
+                        >
+                          인스타 열기
+                        </button>
                         <button
                           type="button"
                           onClick={() => onEdit(artist)}

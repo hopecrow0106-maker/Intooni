@@ -16,17 +16,18 @@ export type ArtistFormValues = {
   last_stats_updated_at: string;
   hashtags: string[];
   hidden_tags: string[];
+  mood_tags: string[];
+  episode_formats: string[];
+  style_tags: string[];
+  topic_tags: string[];
   memo: string;
   bio: string;
-  style_tags: string[];
-  mood_tags: string[];
-  topic_tags: string[];
-  target_audience_tags: string[];
   thumbnail_url: string;
   character_url: string;
   gallery_post_urls: string[];
   is_ad: boolean;
   is_hot: boolean;
+  hide_from_new: boolean;
   sort_order: number;
 };
 
@@ -44,6 +45,14 @@ type UploadingState = {
   thumbnail: boolean;
   character: boolean;
 };
+
+type TagFieldKey =
+  | "hashtags"
+  | "hidden_tags"
+  | "mood_tags"
+  | "episode_formats"
+  | "style_tags"
+  | "topic_tags";
 
 const EMPTY_GALLERY_POST_URLS = ["", "", "", ""];
 
@@ -75,12 +84,12 @@ function createInitialState(artist: Artist | null, categories: Category[]): Arti
     last_stats_updated_at: artist?.last_stats_updated_at ?? new Date().toISOString(),
     hashtags: artist?.hashtags ?? [],
     hidden_tags: artist?.hidden_tags ?? [],
+    mood_tags: artist?.mood_tags ?? [],
+    episode_formats: artist?.episode_formats ?? [],
+    style_tags: artist?.style_tags ?? [],
+    topic_tags: artist?.topic_tags ?? [],
     memo: artist?.memo ?? "",
     bio: artist?.bio ?? "",
-    style_tags: artist?.style_tags ?? [],
-    mood_tags: artist?.mood_tags ?? [],
-    topic_tags: artist?.topic_tags ?? [],
-    target_audience_tags: artist?.target_audience_tags ?? [],
     thumbnail_url: artist?.thumbnail_url ?? "",
     character_url: artist?.character_url ?? "",
     gallery_post_urls: artist?.gallery_post_urls.length
@@ -88,12 +97,72 @@ function createInitialState(artist: Artist | null, categories: Category[]): Arti
       : [...EMPTY_GALLERY_POST_URLS],
     is_ad: artist?.is_ad ?? false,
     is_hot: artist?.is_hot ?? false,
+    hide_from_new: artist?.hide_from_new ?? false,
     sort_order: artist?.sort_order ?? 0
   };
 }
 
 function isKoreanComposing(event: ReactKeyboardEvent<HTMLInputElement>) {
   return event.nativeEvent.isComposing || event.keyCode === 229;
+}
+
+function TagSection({
+  label,
+  helper,
+  inputValue,
+  onInputChange,
+  onAdd,
+  onKeyDown,
+  tags,
+  onRemove,
+  chipClassName = "rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-600"
+}: {
+  label: string;
+  helper?: string;
+  inputValue: string;
+  onInputChange: (value: string) => void;
+  onAdd: () => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
+  tags: string[];
+  onRemove: (value: string) => void;
+  chipClassName?: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <span className="text-sm font-medium text-slate-600">{label}</span>
+        {helper ? <p className="text-xs text-slate-400">{helper}</p> : null}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={inputValue}
+          onChange={(event) => onInputChange(event.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="입력 후 Enter"
+          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
+        />
+        <button
+          type="button"
+          onClick={onAdd}
+          className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white"
+        >
+          추가
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <button
+            key={tag}
+            type="button"
+            onClick={() => onRemove(tag)}
+            className={chipClassName}
+          >
+            {tag} ×
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function ArtistForm({
@@ -108,10 +177,10 @@ export function ArtistForm({
   const [form, setForm] = useState<ArtistFormValues>(createInitialState(initialArtist, categories));
   const [tagInput, setTagInput] = useState("");
   const [hiddenTagInput, setHiddenTagInput] = useState("");
-  const [styleTagInput, setStyleTagInput] = useState("");
-  const [moodTagInput, setMoodTagInput] = useState("");
-  const [topicTagInput, setTopicTagInput] = useState("");
-  const [targetAudienceTagInput, setTargetAudienceTagInput] = useState("");
+  const [moodInput, setMoodInput] = useState("");
+  const [episodeFormatInput, setEpisodeFormatInput] = useState("");
+  const [styleInput, setStyleInput] = useState("");
+  const [topicInput, setTopicInput] = useState("");
   const [uploading, setUploading] = useState<UploadingState>({
     thumbnail: false,
     character: false
@@ -125,10 +194,10 @@ export function ArtistForm({
     setForm(createInitialState(initialArtist, categories));
     setTagInput("");
     setHiddenTagInput("");
-    setStyleTagInput("");
-    setMoodTagInput("");
-    setTopicTagInput("");
-    setTargetAudienceTagInput("");
+    setMoodInput("");
+    setEpisodeFormatInput("");
+    setStyleInput("");
+    setTopicInput("");
     setFormMessage("");
     setUploading({ thumbnail: false, character: false });
   }, [categories, initialArtist, isOpen]);
@@ -143,6 +212,7 @@ export function ArtistForm({
     return null;
   }
 
+  const formId = "artist-admin-form";
   const isBusy = saving || uploading.thumbnail || uploading.character || categoryBusy;
 
   const uploadFile = async (file: File, folder = "artists") => {
@@ -236,11 +306,7 @@ export function ArtistForm({
     setHiddenTagInput("");
   };
 
-  const addTagToField = (
-    field: "style_tags" | "mood_tags" | "topic_tags" | "target_audience_tags",
-    rawValue: string,
-    clear: () => void
-  ) => {
+  const addArrayValue = (field: TagFieldKey, rawValue: string, clear: () => void) => {
     const normalized = rawValue.trim();
     if (!normalized) {
       return;
@@ -253,6 +319,13 @@ export function ArtistForm({
         : [...current[field], normalized]
     }));
     clear();
+  };
+
+  const removeArrayValue = (field: TagFieldKey, value: string) => {
+    setForm((current) => ({
+      ...current,
+      [field]: current[field].filter((item) => item !== value)
+    }));
   };
 
   const saveCategory = async () => {
@@ -279,7 +352,7 @@ export function ArtistForm({
       }
 
       await onCategoriesChanged();
-      if (!form.genre) {
+      if (!form.genre || (initialArtist && form.genre === initialArtist.genre)) {
         setForm((current) => ({ ...current, genre: name }));
       }
       setCategoryInput("");
@@ -324,77 +397,54 @@ export function ArtistForm({
     }
   };
 
-  const tagSections = [
-    {
-      label: "그림체 태그",
-      helper: "예: 흑백, 파스텔, 캐릭터중심, 단순한그림체",
-      value: styleTagInput,
-      setValue: setStyleTagInput,
-      field: "style_tags" as const,
-      tags: form.style_tags
-    },
-    {
-      label: "분위기 태그",
-      helper: "예: 공감, 위로, 병맛, 몰입감",
-      value: moodTagInput,
-      setValue: setMoodTagInput,
-      field: "mood_tags" as const,
-      tags: form.mood_tags
-    },
-    {
-      label: "주제 태그",
-      helper: "예: 자취, 직장인, 대학생, 고양이",
-      value: topicTagInput,
-      setValue: setTopicTagInput,
-      field: "topic_tags" as const,
-      tags: form.topic_tags
-    },
-    {
-      label: "독자층 태그",
-      helper: "예: 20대, 직장인, 여성향, 부모",
-      value: targetAudienceTagInput,
-      setValue: setTargetAudienceTagInput,
-      field: "target_audience_tags" as const,
-      tags: form.target_audience_tags
-    }
-  ];
-
   return (
     <div className="fixed inset-0 z-50 bg-ink/50" onClick={onClose}>
       <div
         className="absolute inset-x-0 bottom-0 h-[94vh] overflow-y-auto rounded-t-[32px] bg-[#fffdf9] p-5 shadow-[0_-24px_70px_rgba(16,24,40,0.24)] md:left-auto md:right-6 md:top-6 md:h-auto md:max-h-[calc(100vh-3rem)] md:w-[720px] md:rounded-[32px]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium text-coral">Admin Form</p>
             <h2 className="font-[var(--font-display)] text-2xl font-semibold text-ink">
               {initialArtist ? "작가 수정" : "작가 추가"}
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600"
-          >
-            닫기
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              form={formId}
+              disabled={isBusy || !form.genre}
+              className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-coral disabled:cursor-wait disabled:opacity-70"
+            >
+              {isBusy ? "저장 중.." : "저장하기"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600"
+            >
+              닫기
+            </button>
+          </div>
         </div>
 
         <form
+          id={formId}
           className="space-y-5"
           onSubmit={async (event) => {
             event.preventDefault();
             setFormMessage("");
+
             await onSave({
               ...form,
               instagram_handle: form.instagram_handle.replace(/^@/, ""),
               hashtags: form.hashtags.map((tag) => tag.trim()).filter(Boolean),
               hidden_tags: form.hidden_tags.map((tag) => tag.trim()).filter(Boolean),
-              style_tags: form.style_tags.map((tag) => tag.trim()).filter(Boolean),
               mood_tags: form.mood_tags.map((tag) => tag.trim()).filter(Boolean),
+              episode_formats: form.episode_formats.map((tag) => tag.trim()).filter(Boolean),
+              style_tags: form.style_tags.map((tag) => tag.trim()).filter(Boolean),
               topic_tags: form.topic_tags.map((tag) => tag.trim()).filter(Boolean),
-              target_audience_tags: form.target_audience_tags.map((tag) => tag.trim()).filter(Boolean),
               gallery_post_urls: form.gallery_post_urls.map((url) => url.trim()).filter(Boolean)
             });
           }}
@@ -432,7 +482,7 @@ export function ArtistForm({
             </label>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-600">요즘 뜨는 작가</span>
               <button
@@ -454,6 +504,19 @@ export function ArtistForm({
                 <span className={`switch-thumb ${form.is_ad ? "translate-x-6" : "translate-x-1"}`} />
               </button>
             </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-600">NEW 제외</span>
+              <button
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, hide_from_new: !current.hide_from_new }))}
+                className={`switch-track ${form.hide_from_new ? "bg-slate-500" : "bg-slate-300"}`}
+              >
+                <span
+                  className={`switch-thumb ${form.hide_from_new ? "translate-x-6" : "translate-x-1"}`}
+                />
+              </button>
+            </label>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -465,7 +528,7 @@ export function ArtistForm({
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
               >
                 {categories.length === 0 ? (
-                  <option value="">카테고리를 먼저 추가해주세요</option>
+                  <option value="">카테고리를 먼저 추가해 주세요</option>
                 ) : (
                   categories.map((category) => (
                     <option key={category.id} value={category.name}>
@@ -480,7 +543,7 @@ export function ArtistForm({
           <div className="rounded-[24px] border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-700">카테고리 관리</span>
-              {categoryBusy ? <span className="text-xs text-slate-400">처리 중...</span> : null}
+              {categoryBusy ? <span className="text-xs text-slate-400">처리 중..</span> : null}
             </div>
             <div className="flex gap-2">
               <input
@@ -539,26 +602,31 @@ export function ArtistForm({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {[
-              ["팔로워 수", "followers"],
-              ["게시물 수", "post_count"]
-            ].map(([label, key]) => (
-              <label key={key} className="space-y-2">
-                <span className="text-sm font-medium text-slate-600">{label}</span>
-                <input
-                  min={0}
-                  type="number"
-                  value={form[key as keyof ArtistFormValues] as number}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      [key]: Number(event.target.value)
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-                />
-              </label>
-            ))}
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-600">팔로워 수</span>
+              <input
+                min={0}
+                type="number"
+                value={form.followers}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, followers: Number(event.target.value) }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
+              />
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-600">게시물 수</span>
+              <input
+                min={0}
+                type="number"
+                value={form.post_count}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, post_count: Number(event.target.value) }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
+              />
+            </label>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
@@ -585,14 +653,14 @@ export function ArtistForm({
             <textarea
               value={form.memo}
               onChange={(event) => setForm((current) => ({ ...current, memo: event.target.value }))}
-              placeholder="작가 소개나 검색에 도움이 될 메모를 입력해주세요"
+              placeholder="작가 소개나 운영 메모를 적어주세요"
               rows={4}
               className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
             />
           </label>
 
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-600">공개 한 줄 소개</span>
+            <span className="text-sm font-medium text-slate-600">공개용 한 줄 소개</span>
             <textarea
               value={form.bio}
               onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))}
@@ -602,168 +670,134 @@ export function ArtistForm({
             />
           </label>
 
-          {tagSections.map((section) => (
-            <div key={section.field} className="space-y-3">
-              <div className="space-y-1">
-                <span className="text-sm font-medium text-slate-600">{section.label}</span>
-                <p className="text-xs text-slate-400">{section.helper}</p>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={section.value}
-                  onChange={(event) => section.setValue(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (isKoreanComposing(event)) {
-                      return;
-                    }
+          <TagSection
+            label="공개 해시태그"
+            inputValue={tagInput}
+            onInputChange={setTagInput}
+            onAdd={addVisibleTag}
+            onKeyDown={(event) => {
+              if (isKoreanComposing(event)) {
+                return;
+              }
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addVisibleTag();
+              }
+            }}
+            tags={form.hashtags}
+            onRemove={(value) => removeArrayValue("hashtags", value)}
+          />
 
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      addTagToField(section.field, section.value, () => section.setValue(""));
-                    }
-                  }}
-                  placeholder="입력 후 Enter"
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    addTagToField(section.field, section.value, () => section.setValue(""))
-                  }
-                  className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white"
-                >
-                  추가
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {section.tags.map((tag) => (
-                  <button
-                    key={`${section.field}-${tag}`}
-                    type="button"
-                    onClick={() =>
-                      setForm((current) => ({
-                        ...current,
-                        [section.field]: current[section.field].filter((item) => item !== tag)
-                      }))
-                    }
-                    className="rounded-full border border-dashed border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-500"
-                  >
-                    {tag} ×
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+          <TagSection
+            label="숨김 검색 태그"
+            helper="사용자에게는 보이지 않고 검색에만 들어갑니다. 예: 이지, 흑백, 그림 일기"
+            inputValue={hiddenTagInput}
+            onInputChange={setHiddenTagInput}
+            onAdd={addHiddenTag}
+            onKeyDown={(event) => {
+              if (isKoreanComposing(event)) {
+                return;
+              }
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addHiddenTag();
+              }
+            }}
+            tags={form.hidden_tags}
+            onRemove={(value) => removeArrayValue("hidden_tags", value)}
+            chipClassName="rounded-full border border-dashed border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-500"
+          />
 
-          <div className="space-y-3">
-            <span className="text-sm font-medium text-slate-600">공개 해시태그</span>
-            <div className="flex gap-2">
-              <input
-                value={tagInput}
-                onChange={(event) => setTagInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (isKoreanComposing(event)) {
-                    return;
-                  }
+          <TagSection
+            label="툰비티아이 분위기"
+            helper="예: 개그, 잔잔, 달달, 고자극, 귀여움"
+            inputValue={moodInput}
+            onInputChange={setMoodInput}
+            onAdd={() => addArrayValue("mood_tags", moodInput, () => setMoodInput(""))}
+            onKeyDown={(event) => {
+              if (isKoreanComposing(event)) {
+                return;
+              }
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addArrayValue("mood_tags", moodInput, () => setMoodInput(""));
+              }
+            }}
+            tags={form.mood_tags}
+            onRemove={(value) => removeArrayValue("mood_tags", value)}
+            chipClassName="rounded-full bg-[#fff0f3] px-3 py-1.5 text-sm text-[#c9153d]"
+          />
 
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    addVisibleTag();
-                  }
-                }}
-                placeholder="입력 후 Enter"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-              <button
-                type="button"
-                onClick={addVisibleTag}
-                className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white"
-              >
-                추가
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {form.hashtags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() =>
-                    setForm((current) => ({
-                      ...current,
-                      hashtags: current.hashtags.filter((item) => item !== tag)
-                    }))
-                  }
-                  className="rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-600"
-                >
-                  {tag} ×
-                </button>
-              ))}
-            </div>
-          </div>
+          <TagSection
+            label="툰비티아이 에피소드 형식"
+            helper="예: 짧다, 중간, 길다"
+            inputValue={episodeFormatInput}
+            onInputChange={setEpisodeFormatInput}
+            onAdd={() =>
+              addArrayValue("episode_formats", episodeFormatInput, () => setEpisodeFormatInput(""))
+            }
+            onKeyDown={(event) => {
+              if (isKoreanComposing(event)) {
+                return;
+              }
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addArrayValue("episode_formats", episodeFormatInput, () =>
+                  setEpisodeFormatInput("")
+                );
+              }
+            }}
+            tags={form.episode_formats}
+            onRemove={(value) => removeArrayValue("episode_formats", value)}
+            chipClassName="rounded-full bg-[#eef7ff] px-3 py-1.5 text-sm text-[#2b6cb0]"
+          />
 
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <span className="text-sm font-medium text-slate-600">숨김 검색 태그</span>
-              <p className="text-xs text-slate-400">
-                사용자에겐 보이지 않고 검색에만 들어갑니다. 예: 이지, 흑백, 그림 일기
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={hiddenTagInput}
-                onChange={(event) => setHiddenTagInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (isKoreanComposing(event)) {
-                    return;
-                  }
+          <TagSection
+            label="툰비티아이 그림체"
+            helper="예: 단순, 귀여움, 감성적, 현실적, 개성적, 흑백, 컬러풀, 밈"
+            inputValue={styleInput}
+            onInputChange={setStyleInput}
+            onAdd={() => addArrayValue("style_tags", styleInput, () => setStyleInput(""))}
+            onKeyDown={(event) => {
+              if (isKoreanComposing(event)) {
+                return;
+              }
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addArrayValue("style_tags", styleInput, () => setStyleInput(""));
+              }
+            }}
+            tags={form.style_tags}
+            onRemove={(value) => removeArrayValue("style_tags", value)}
+            chipClassName="rounded-full bg-[#f4f0ff] px-3 py-1.5 text-sm text-[#5a43d6]"
+          />
 
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    addHiddenTag();
-                  }
-                }}
-                placeholder="입력 후 Enter"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-              <button
-                type="button"
-                onClick={addHiddenTag}
-                className="rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white"
-              >
-                추가
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {form.hidden_tags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() =>
-                    setForm((current) => ({
-                      ...current,
-                      hidden_tags: current.hidden_tags.filter((item) => item !== tag)
-                    }))
-                  }
-                  className="rounded-full border border-dashed border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-500"
-                >
-                  {tag} ×
-                </button>
-              ))}
-            </div>
-          </div>
+          <TagSection
+            label="툰비티아이 주제"
+            helper="예: 연애, 직장, 일상, 썰, 괴담, 대학생, 여행, 운동, 군대, 워홀, 공룡"
+            inputValue={topicInput}
+            onInputChange={setTopicInput}
+            onAdd={() => addArrayValue("topic_tags", topicInput, () => setTopicInput(""))}
+            onKeyDown={(event) => {
+              if (isKoreanComposing(event)) {
+                return;
+              }
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addArrayValue("topic_tags", topicInput, () => setTopicInput(""));
+              }
+            }}
+            tags={form.topic_tags}
+            onRemove={(value) => removeArrayValue("topic_tags", value)}
+            chipClassName="rounded-full bg-[#fff8e1] px-3 py-1.5 text-sm text-[#946200]"
+          />
 
           <div className="space-y-3">
             <span className="text-sm font-medium text-slate-600">대표 썸네일</span>
             <div className="grid gap-4 md:grid-cols-[180px_1fr]">
               <div className="relative aspect-square overflow-hidden rounded-[24px] border border-dashed border-slate-200 bg-slate-50">
                 {form.thumbnail_url ? (
-                  <Image
-                    src={form.thumbnail_url}
-                    alt="대표 썸네일"
-                    fill
-                    className="object-cover"
-                    sizes="180px"
-                  />
+                  <Image src={form.thumbnail_url} alt="대표 썸네일" fill className="object-cover" sizes="180px" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">
                     이미지 없음
@@ -771,7 +805,7 @@ export function ArtistForm({
                 )}
                 {uploading.thumbnail ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-semibold text-ink">
-                    업로드 중...
+                    업로드 중..
                   </div>
                 ) : null}
               </div>
@@ -819,7 +853,7 @@ export function ArtistForm({
                 )}
                 {uploading.character ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-sm font-semibold text-ink">
-                    업로드 중...
+                    업로드 중..
                   </div>
                 ) : null}
               </div>
@@ -849,9 +883,7 @@ export function ArtistForm({
               {[0, 1, 2, 3].map((index) => (
                 <div key={index} className="space-y-3 rounded-[24px] border border-slate-200 bg-white p-4">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-600">
-                      갤러리 게시물 링크 {index + 1}
-                    </span>
+                    <span className="text-sm font-medium text-slate-600">갤러리 게시물 링크 {index + 1}</span>
                     <input
                       value={form.gallery_post_urls[index]}
                       onChange={(event) => updateGalleryPostUrlAt(index, event.target.value)}
@@ -876,7 +908,7 @@ export function ArtistForm({
             disabled={isBusy || !form.genre}
             className="w-full rounded-full bg-ink px-5 py-4 text-sm font-semibold text-white transition hover:bg-coral disabled:cursor-wait disabled:opacity-70"
           >
-            {isBusy ? "저장 중..." : "저장하기"}
+            {isBusy ? "저장 중.." : "저장하기"}
           </button>
         </form>
       </div>
