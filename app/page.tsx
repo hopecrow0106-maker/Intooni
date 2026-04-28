@@ -661,10 +661,10 @@ export default function HomePage() {
             >
               <span className="shrink-0 text-4xl">📣</span>
               <div className="min-w-0 text-left">
-                <h3 className="mb-0.5 text-[17px] font-extrabold tracking-[-0.02em]">
+                <h3 className="mb-0.5 break-keep text-[17px] font-extrabold tracking-[-0.02em]">
                   인스타툰 작가신가요?
                 </h3>
-                <p className="text-sm leading-snug opacity-80">
+                <p className="break-keep text-sm leading-snug opacity-80">
                   인투니에 등록하면 광고주·브랜드가 먼저 연락해와요
                 </p>
               </div>
@@ -680,8 +680,9 @@ export default function HomePage() {
             >
               <span className="shrink-0 text-4xl">📝</span>
               <div className="min-w-0 flex-1 text-left">
-                <h3 className="mb-0.5 text-[17px] font-extrabold tracking-[-0.02em] text-[#1a1a1a]">
-                  인투니 작가 등록 신청
+                <h3 className="mb-0.5 break-keep text-[17px] font-extrabold leading-tight tracking-[-0.02em] text-[#1a1a1a]">
+                  <span className="block sm:inline">인투니 작가</span>{" "}
+                  <span className="block sm:inline">등록 신청</span>
                 </h3>
               </div>
               <span className="rounded-full bg-[#fff0f3] px-4 py-2 text-sm font-semibold text-[#c9153d]">
