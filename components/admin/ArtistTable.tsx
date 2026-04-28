@@ -27,6 +27,7 @@ type ArtistTableProps = {
   onToggleHot: (artist: Artist) => void;
   onReorder: (artists: Artist[]) => void;
   isSaving: boolean;
+  reorderEnabled?: boolean;
 };
 
 const STALE_DAYS = 14;
@@ -61,6 +62,15 @@ function isStale(value: string) {
   }
 
   return Date.now() - date.getTime() > STALE_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function isToonbtiDataMissing(artist: Artist) {
+  return (
+    artist.mood_tags.length === 0 ||
+    artist.episode_formats.length === 0 ||
+    artist.style_tags.length === 0 ||
+    artist.topic_tags.length === 0
+  );
 }
 
 function getPeriodLabel(period: ArtistStatsPeriod) {
@@ -109,7 +119,8 @@ export function ArtistTable({
   onToggleAd,
   onToggleHot,
   onReorder,
-  isSaving
+  isSaving,
+  reorderEnabled = true
 }: ArtistTableProps) {
   const [localArtists, setLocalArtists] = useState(artists);
 
@@ -127,6 +138,10 @@ export function ArtistTable({
   };
 
   const handleDragEnd = (result: DropResult) => {
+    if (!reorderEnabled) {
+      return;
+    }
+
     if (!result.destination) {
       return;
     }
@@ -148,7 +163,12 @@ export function ArtistTable({
               };
 
               return (
-                <Draggable key={artist.id} draggableId={artist.id} index={index}>
+                <Draggable
+                  key={artist.id}
+                  draggableId={artist.id}
+                  index={index}
+                  isDragDisabled={!reorderEnabled}
+                >
                   {(dragProvided) => (
                     <div
                       ref={dragProvided.innerRef}
@@ -158,8 +178,10 @@ export function ArtistTable({
                       <div className="flex items-start gap-4">
                         <div
                           {...dragProvided.dragHandleProps}
-                          className="relative h-16 w-16 cursor-grab overflow-hidden rounded-2xl bg-slate-100 active:cursor-grabbing"
-                          title="드래그해서 순서 변경"
+                          className={`relative h-16 w-16 overflow-hidden rounded-2xl bg-slate-100 ${
+                            reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""
+                          }`}
+                          title={reorderEnabled ? "드래그해서 순서 변경" : "최신순 페이지 목록"}
                         >
                           <Image
                             src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
@@ -190,6 +212,11 @@ export function ArtistTable({
                             {artist.hide_from_new ? (
                               <span className="rounded-full bg-slate-200 px-2.5 py-1 font-semibold text-slate-600">
                                 NEW 제외
+                              </span>
+                            ) : null}
+                            {isToonbtiDataMissing(artist) ? (
+                              <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-600">
+                                툰비티아이 데이터 누락!
                               </span>
                             ) : null}
                           </div>

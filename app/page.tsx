@@ -11,6 +11,7 @@ import {
 } from "@/components/FilterBar";
 import { ArtistCard } from "@/components/ArtistCard";
 import { ArtistModal } from "@/components/ArtistModal";
+import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { SearchBar } from "@/components/SearchBar";
 import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/placeholders";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
@@ -61,6 +62,23 @@ function shuffleItems<T>(items: T[]) {
   return shuffled;
 }
 
+function getFallbackInstagramUrl(artist: Artist) {
+  return artist.gallery_post_urls.find((url) => url.trim()) ?? "";
+}
+
+function sortProfileFirst<T extends Artist>(artists: T[]) {
+  return [...artists].sort((a, b) => {
+    const aHasProfile = Boolean(a.thumbnail_url);
+    const bHasProfile = Boolean(b.thumbnail_url);
+
+    if (aHasProfile !== bHasProfile) {
+      return Number(bHasProfile) - Number(aHasProfile);
+    }
+
+    return 0;
+  });
+}
+
 function createRandomOrderMap(artists: Artist[]) {
   return shuffleItems(artists).reduce<Record<string, number>>((acc, artist, index) => {
     acc[artist.id] = index;
@@ -105,25 +123,43 @@ function ArtistSkeletonCard() {
 
 function HorizontalArtistCard({
   artist,
-  index,
   onClick
 }: {
   artist: Artist;
-  index: number;
   onClick: () => void;
 }) {
+  const fallbackInstagramUrl = getFallbackInstagramUrl(artist);
+
   return (
     <button type="button" onClick={onClick} className="trending-card text-left">
-      <span className="trending-rank">{index + 1}</span>
-      <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
-        <Image
-          src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
-          alt={artist.name}
-          fill
-          className="object-cover"
-          sizes="240px"
-        />
-      </div>
+      {artist.thumbnail_url ? (
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+          <Image
+            src={artist.thumbnail_url}
+            alt={artist.name}
+            fill
+            className="object-cover"
+            sizes="240px"
+          />
+        </div>
+      ) : fallbackInstagramUrl ? (
+        <div className="bg-white p-2">
+          <InstagramEmbed
+            url={fallbackInstagramUrl}
+            className="min-h-[180px] rounded-[14px] border border-[rgba(0,0,0,0.08)]"
+          />
+        </div>
+      ) : (
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+          <Image
+            src={ARTIST_SQUARE_PLACEHOLDER}
+            alt={artist.name}
+            fill
+            className="object-cover"
+            sizes="240px"
+          />
+        </div>
+      )}
       <div className="trending-info">
         <p className="trending-name">{artist.name}</p>
         <p className="trending-sub">
@@ -143,6 +179,8 @@ function NewArtistGridCard({
   index: number;
   onClick: () => void;
 }) {
+  const fallbackInstagramUrl = getFallbackInstagramUrl(artist);
+
   return (
     <button
       type="button"
@@ -152,15 +190,34 @@ function NewArtistGridCard({
       <span className="absolute left-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-[#1e243d] text-lg font-bold text-white">
         {index + 1}
       </span>
-      <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
-        <Image
-          src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
-          alt={artist.name}
-          fill
-          className="object-cover transition duration-300 group-hover:scale-[1.03]"
-          sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 280px"
-        />
-      </div>
+      {artist.thumbnail_url ? (
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+          <Image
+            src={artist.thumbnail_url}
+            alt={artist.name}
+            fill
+            className="object-cover transition duration-300 group-hover:scale-[1.03]"
+            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 280px"
+          />
+        </div>
+      ) : fallbackInstagramUrl ? (
+        <div className="bg-white p-2">
+          <InstagramEmbed
+            url={fallbackInstagramUrl}
+            className="min-h-[230px] rounded-[18px] border border-[rgba(0,0,0,0.08)]"
+          />
+        </div>
+      ) : (
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+          <Image
+            src={ARTIST_SQUARE_PLACEHOLDER}
+            alt={artist.name}
+            fill
+            className="object-cover transition duration-300 group-hover:scale-[1.03]"
+            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 280px"
+          />
+        </div>
+      )}
       <div className="space-y-1 px-5 pb-5 pt-4">
         <p className="text-[15px] font-bold tracking-[-0.02em] text-[#1a1a1a]">{artist.name}</p>
         <p className="text-sm text-[#8a8a8a]">
@@ -264,7 +321,7 @@ export default function HomePage() {
       setArtistRandomOrder(createRandomOrderMap(nextArtists));
       setHeroDecorations(pickHeroDecorations(nextArtists));
 
-      const hotArtists = hotResponse.error ? [] : (hotResponse.data ?? []);
+      const hotArtists = hotResponse.error ? [] : sortProfileFirst(hotResponse.data ?? []);
       setFeaturedHotArtists(hotArtists);
 
       setLoading(false);
@@ -404,11 +461,29 @@ export default function HomePage() {
 
   const featuredNewArtists = useMemo(
     () =>
-      [...allArtists]
-        .filter((artist) => !artist.hide_from_new)
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 4),
+      sortProfileFirst(
+        [...allArtists]
+          .filter((artist) => !artist.hide_from_new)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 4)
+      ),
     [allArtists]
+  );
+  const featuredNewProfileArtists = useMemo(
+    () => featuredNewArtists.filter((artist) => artist.thumbnail_url),
+    [featuredNewArtists]
+  );
+  const featuredNewEmbedArtists = useMemo(
+    () => featuredNewArtists.filter((artist) => !artist.thumbnail_url && getFallbackInstagramUrl(artist)),
+    [featuredNewArtists]
+  );
+  const featuredHotProfileArtists = useMemo(
+    () => featuredHotArtists.filter((artist) => artist.thumbnail_url),
+    [featuredHotArtists]
+  );
+  const featuredHotEmbedArtists = useMemo(
+    () => featuredHotArtists.filter((artist) => !artist.thumbnail_url && getFallbackInstagramUrl(artist)),
+    [featuredHotArtists]
   );
 
   const filteredArtists = useMemo(() => {
@@ -522,6 +597,18 @@ export default function HomePage() {
           </Link>
         </div>
       </nav>
+
+      <div className="border-b border-[rgba(0,0,0,0.07)] bg-[rgba(248,247,244,0.96)] px-4 py-2 sm:hidden">
+        <Link
+          href="/toonbti"
+          className="flex items-center justify-between rounded-[18px] border border-[#ffd6df] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(255,77,109,0.08)]"
+        >
+          <span className="text-sm font-bold text-[#1a1a1a]">나랑 맞는 작가는?</span>
+          <span className="rounded-full bg-[#fff0f3] px-3 py-1.5 text-xs font-bold text-[#ff4d6d]">
+            테스트하러 고고!
+          </span>
+        </Link>
+      </div>
 
       <main className="mx-auto w-full max-w-[1520px] xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
         <aside className="hidden xl:block">
@@ -794,16 +881,29 @@ export default function HomePage() {
                   🔥 요즘 뜨는 작가들
                 </h2>
               </div>
-              <div className="trending-row">
-                {featuredHotArtists.map((artist, index) => (
-                  <HorizontalArtistCard
-                    key={artist.id}
-                    artist={artist}
-                    index={index}
-                    onClick={() => openArtistModal(artist, "profile_click")}
-                  />
-                ))}
-              </div>
+              {featuredHotProfileArtists.length > 0 ? (
+                <div className="trending-row">
+                  {featuredHotProfileArtists.map((artist) => (
+                    <HorizontalArtistCard
+                      key={artist.id}
+                      artist={artist}
+                      onClick={() => openArtistModal(artist, "profile_click")}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {featuredHotEmbedArtists.length > 0 ? (
+                <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {featuredHotEmbedArtists.map((artist, index) => (
+                    <NewArtistGridCard
+                      key={artist.id}
+                      artist={artist}
+                      index={featuredHotProfileArtists.length + index}
+                      onClick={() => openArtistModal(artist, "profile_click")}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -814,16 +914,30 @@ export default function HomePage() {
                   ✨ 새로운 인투니들!
                 </h2>
               </div>
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {featuredNewArtists.map((artist, index) => (
-                  <NewArtistGridCard
-                    key={artist.id}
-                    artist={artist}
-                    index={index}
-                    onClick={() => openArtistModal(artist, "profile_click")}
-                  />
-                ))}
-              </div>
+              {featuredNewProfileArtists.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                  {featuredNewProfileArtists.map((artist, index) => (
+                    <NewArtistGridCard
+                      key={artist.id}
+                      artist={artist}
+                      index={index}
+                      onClick={() => openArtistModal(artist, "profile_click")}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {featuredNewEmbedArtists.length > 0 ? (
+                <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {featuredNewEmbedArtists.map((artist, index) => (
+                    <NewArtistGridCard
+                      key={artist.id}
+                      artist={artist}
+                      index={featuredNewProfileArtists.length + index}
+                      onClick={() => openArtistModal(artist, "profile_click")}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </section>
           ) : null}
 

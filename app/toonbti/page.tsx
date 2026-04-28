@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArtistModal } from "@/components/ArtistModal";
+import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { ARTIST_SQUARE_PLACEHOLDER } from "@/lib/placeholders";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { Artist } from "@/lib/types";
@@ -42,7 +43,7 @@ const QUESTIONS: ToonbtiQuestion[] = [
     title: "에피소드는 이 정도 호흡이 좋지..",
     helper: "1개 선택",
     maxSelections: 1,
-    weight: 2,
+    weight: 3,
     options: [
       { label: "짧다", description: "한 화마다 바로 끝남" },
       { label: "중간", description: "2~3화 안에 마무리" },
@@ -55,7 +56,7 @@ const QUESTIONS: ToonbtiQuestion[] = [
     title: "그림체는 이런 게 좋더라",
     helper: "최대 2개 선택",
     maxSelections: 2,
-    weight: 2,
+    weight: 3,
     options: [
       { label: "단순" },
       { label: "귀여움" },
@@ -108,6 +109,13 @@ const FLOATING_CHARACTER_POSITIONS = [
   "right-[7vw] bottom-[11vh] h-32 w-32 xl:right-[8vw] xl:h-44 xl:w-44",
   "left-[18vw] bottom-[26vh] h-20 w-20 xl:left-[19vw] xl:h-28 xl:w-28"
 ];
+const MOBILE_FLOATING_CHARACTER_POSITIONS = [
+  "left-[4%] top-8 h-20 w-20",
+  "left-[34%] top-2 h-24 w-24",
+  "right-[5%] top-10 h-20 w-20",
+  "left-[19%] bottom-3 h-16 w-16",
+  "right-[24%] bottom-0 h-24 w-24"
+];
 
 function getOverlapCount(values: string[], selected: string[]) {
   const normalizedValues = new Set(values.map((value) => value.trim()).filter(Boolean));
@@ -115,6 +123,10 @@ function getOverlapCount(values: string[], selected: string[]) {
 }
 
 function scoreArtist(artist: Artist, answers: ToonbtiAnswers) {
+  if (answers.style_tags.includes("흑백") && !artist.style_tags.includes("흑백")) {
+    return 0;
+  }
+
   return QUESTIONS.reduce((score, question) => {
     const selected = answers[question.key];
 
@@ -136,6 +148,10 @@ function formatChoiceSummary(answers: ToonbtiAnswers) {
   }
 
   return `${selected.join(", ")} 쪽의 인스타툰을 좋아하는 타입이에요.`;
+}
+
+function getFallbackInstagramUrl(artist: Artist) {
+  return artist.gallery_post_urls.find((url) => url.trim()) ?? "";
 }
 
 function pickFloatingArtists(artists: Artist[], step: number) {
@@ -196,6 +212,46 @@ function FloatingToonbtiCharacters({
   );
 }
 
+function MobileFloatingToonbtiCharacters({
+  artists,
+  onPick
+}: {
+  artists: Array<{ artist: Artist; delay: string; duration: string }>;
+  onPick: (artist: Artist) => void;
+}) {
+  if (artists.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="relative mx-auto mt-8 h-44 max-w-md overflow-hidden rounded-[32px] bg-[#fff9fb] lg:hidden">
+      {artists.slice(0, 5).map(({ artist, delay, duration }, index) => (
+        <button
+          key={artist.id}
+          type="button"
+          aria-label={`${artist.name} 작가 보기`}
+          onClick={() => onPick(artist)}
+          className={`absolute ${MOBILE_FLOATING_CHARACTER_POSITIONS[index]} rounded-[24px] p-2 transition active:scale-95`}
+          style={{
+            animation: `toonbti-character-float ${duration} ease-in-out infinite`,
+            animationDelay: delay
+          }}
+        >
+          <span className="relative block h-full w-full drop-shadow-[0_14px_20px_rgba(0,0,0,0.12)]">
+            <Image
+              src={artist.character_url}
+              alt={artist.name}
+              fill
+              className="object-contain"
+              sizes="96px"
+            />
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ResultArtistCard({
   artist,
   onClick
@@ -235,6 +291,44 @@ function ResultArtistCard({
         </div>
       </div>
     </button>
+  );
+}
+
+function ResultInstagramCard({
+  artist,
+  onClick
+}: {
+  artist: Artist;
+  onClick: () => void;
+}) {
+  const instagramUrl = getFallbackInstagramUrl(artist);
+
+  if (!instagramUrl) {
+    return null;
+  }
+
+  return (
+    <article className="overflow-hidden rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-white">
+      <div className="p-2">
+        <InstagramEmbed
+          url={instagramUrl}
+          className="min-h-[320px] rounded-[18px] border border-[rgba(0,0,0,0.08)]"
+        />
+      </div>
+      <div className="flex items-start justify-between gap-3 px-4 pb-4 pt-2">
+        <div className="min-w-0">
+          <p className="truncate text-base font-bold text-[#1a1a1a]">{artist.name}</p>
+          <p className="mt-1 truncate text-sm text-[#8a8a8a]">{artist.genre} 작가</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClick}
+          className="shrink-0 rounded-full bg-[#fff0f3] px-3 py-1.5 text-xs font-bold text-[#ff4d6d]"
+        >
+          정보 보기
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -297,8 +391,12 @@ export default function ToonbtiPage() {
       }))
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score || b.artist.followers - a.artist.followers)
-      .slice(0, 4);
+      .slice(0, 8);
   }, [answers, artists]);
+  const thumbnailRecommendations = recommendedArtists.filter((item) => item.artist.thumbnail_url);
+  const instagramRecommendations = recommendedArtists.filter(
+    (item) => !item.artist.thumbnail_url && getFallbackInstagramUrl(item.artist)
+  );
 
   const toggleAnswer = (question: ToonbtiQuestion, value: string) => {
     setShowResults(false);
@@ -562,14 +660,38 @@ export default function ToonbtiPage() {
                 <p className="mt-2 text-sm text-[#8a8a8a]">선택지를 조금 바꿔서 다시 찾아볼까요?</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4 md:gap-5 xl:grid-cols-4">
-                {recommendedArtists.map((item, index) => (
-                  <ResultArtistCard
-                    key={item.artist.id}
-                    artist={item.artist}
-                    onClick={() => setSelectedArtist(item.artist)}
-                  />
-                ))}
+              <div className="space-y-8">
+                {thumbnailRecommendations.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 md:gap-5 xl:grid-cols-4">
+                    {thumbnailRecommendations.map((item) => (
+                      <ResultArtistCard
+                        key={item.artist.id}
+                        artist={item.artist}
+                        onClick={() => setSelectedArtist(item.artist)}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+
+                {instagramRecommendations.length > 0 ? (
+                  <section>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-extrabold text-[#1a1a1a]">
+                        인스타 게시물로 보는 추천 작가
+                      </h3>
+                      <span className="text-sm text-[#a0a0a0]">{instagramRecommendations.length}명</span>
+                    </div>
+                    <div className="grid gap-5 md:grid-cols-2">
+                      {instagramRecommendations.map((item) => (
+                      <ResultInstagramCard
+                        key={item.artist.id}
+                        artist={item.artist}
+                        onClick={() => setSelectedArtist(item.artist)}
+                      />
+                    ))}
+                    </div>
+                  </section>
+                ) : null}
               </div>
             )}
 
@@ -584,6 +706,8 @@ export default function ToonbtiPage() {
             </div>
           </section>
         )}
+
+        <MobileFloatingToonbtiCharacters artists={floatingArtists} onPick={setSelectedArtist} />
       </section>
 
       <ArtistModal artist={selectedArtist} onClose={() => setSelectedArtist(null)} />

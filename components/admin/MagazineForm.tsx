@@ -32,6 +32,9 @@ type UploadingState = {
   inlineImage: boolean;
 };
 
+type TextBlockSize = "small" | "body" | "large" | "title";
+type TextBlockAlign = "left" | "center" | "right";
+
 const EMPTY_INSTAGRAM_URLS = ["", "", "", ""];
 
 function formatDateInput(value?: string) {
@@ -64,10 +67,15 @@ function buildImageToken(url: string, size: "wide" | "medium") {
 
 function buildTextToken(
   value: string,
-  size: "body" | "large",
-  align: "left" | "center" | "right"
+  size: TextBlockSize,
+  align: TextBlockAlign,
+  bold = false
 ) {
-  return `\n\n{{text:${value}|${size}|${align}}}\n\n`;
+  return `\n\n{{text:${value}|${size}|${align}|${bold ? "bold" : "normal"}}}\n\n`;
+}
+
+function buildDividerToken() {
+  return "\n\n{{divider}}\n\n";
 }
 
 export function MagazineForm({
@@ -202,14 +210,14 @@ export function MagazineForm({
   return (
     <div className="fixed inset-0 z-50 bg-ink/50" onClick={onClose}>
       <div
-        className="absolute inset-x-0 bottom-0 h-[94vh] overflow-y-auto rounded-t-[32px] bg-[#fffdf9] p-5 shadow-[0_-24px_70px_rgba(16,24,40,0.24)] md:left-auto md:right-6 md:top-6 md:h-auto md:max-h-[calc(100vh-3rem)] md:w-[760px] md:rounded-[32px]"
+        className="absolute inset-x-3 bottom-3 top-3 mx-auto max-w-[1180px] overflow-y-auto rounded-[32px] bg-[#fffdf9] p-5 shadow-[0_24px_90px_rgba(16,24,40,0.28)] md:inset-x-6 md:bottom-6 md:top-6 md:p-7"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-6 flex items-center justify-between">
+        <div className="sticky top-0 z-20 -mx-5 -mt-5 mb-6 flex items-center justify-between border-b border-slate-100 bg-[#fffdf9]/95 px-5 py-4 backdrop-blur md:-mx-7 md:-mt-7 md:px-7">
           <div>
             <p className="text-sm font-medium text-coral">Magazine Form</p>
             <h2 className="font-[var(--font-display)] text-2xl font-semibold text-ink">
-              {initialMagazine ? "매거진 수정" : "매거진 추가"}
+              {initialMagazine ? "매거진 글 수정" : "매거진 글 작성"}
             </h2>
           </div>
           <button
@@ -222,7 +230,7 @@ export function MagazineForm({
         </div>
 
         <form
-          className="space-y-5"
+          className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]"
           onSubmit={async (event) => {
             event.preventDefault();
             setFormMessage("");
@@ -235,12 +243,12 @@ export function MagazineForm({
           }}
         >
           {formMessage ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 lg:col-span-2">
               {formMessage}
             </div>
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-600">제목</span>
               <input
@@ -264,9 +272,7 @@ export function MagazineForm({
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
               />
             </label>
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <span className="text-sm font-medium text-slate-600">공개 설정</span>
               <div className="flex gap-2">
@@ -306,11 +312,10 @@ export function MagazineForm({
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
               />
             </label>
-          </div>
 
-          <div className="space-y-3">
+            <div className="space-y-3">
             <span className="text-sm font-medium text-slate-600">커버 이미지</span>
-            <div className="grid gap-4 md:grid-cols-[240px_1fr]">
+            <div className="grid gap-4">
               <div className="relative aspect-[2/1] overflow-hidden rounded-[24px] border border-dashed border-slate-200 bg-slate-50">
                 {form.thumbnail_url ? (
                   <Image
@@ -360,6 +365,17 @@ export function MagazineForm({
               </label>
             </div>
           </div>
+
+            <button
+              type="submit"
+              disabled={isBusy}
+              className="w-full rounded-full bg-ink px-5 py-4 text-sm font-semibold text-white transition hover:bg-coral disabled:cursor-wait disabled:opacity-70"
+            >
+              {isBusy ? "저장 중..." : "저장하기"}
+            </button>
+          </aside>
+
+          <section className="space-y-5">
 
           <label className="space-y-2">
             <span className="text-sm font-medium text-slate-600">본문</span>
@@ -412,17 +428,44 @@ export function MagazineForm({
             <div className="mt-4 border-t border-slate-100 pt-4">
               <p className="text-sm font-semibold text-slate-700">텍스트 블록 삽입</p>
               <p className="mt-1 text-xs text-slate-400">
-                큰 글씨와 좌/중/우 정렬 문장을 본문 사이에 바로 넣을 수 있습니다.
+                제목, 작은 글씨, 굵은 글씨, 좌/중/우 정렬 문장을 본문 사이에 바로 넣을 수 있습니다.
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="button"
                   onClick={() =>
-                    insertContentToken(buildTextToken("큰 제목을 입력하세요", "large", "left"))
+                    insertContentToken(buildTextToken("제목을 입력하세요", "title", "left", true))
+                  }
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  제목
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertContentToken(buildTextToken("큰 문장을 입력하세요", "large", "left", true))
                   }
                   className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
                 >
                   큰 글씨
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertContentToken(buildTextToken("작은 설명을 입력하세요", "small", "left"))
+                  }
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  작은 글씨
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    insertContentToken(buildTextToken("굵게 강조할 문장", "body", "left", true))
+                  }
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  굵게
                 </button>
                 <button
                   type="button"
@@ -451,13 +494,20 @@ export function MagazineForm({
                 >
                   뒤에 위치
                 </button>
+                <button
+                  type="button"
+                  onClick={() => insertContentToken(buildDividerToken())}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  구분선
+                </button>
               </div>
             </div>
 
             <div className="mt-4 space-y-2 text-xs text-slate-400">
               <p>{"{{image:URL|wide}}"} / {"{{image:URL|medium}}"} 형식으로 이미지가 저장됩니다.</p>
               <p>
-                {"{{text:문장|large|left}}"} 또는 {"{{text:문장|body|center}}"} 형식으로 텍스트가 저장됩니다.
+                {"{{text:문장|title|left|bold}}"} 또는 {"{{text:문장|body|center|normal}}"} 형식으로 텍스트가 저장됩니다.
               </p>
             </div>
           </div>
@@ -541,13 +591,7 @@ export function MagazineForm({
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isBusy}
-            className="w-full rounded-full bg-ink px-5 py-4 text-sm font-semibold text-white transition hover:bg-coral disabled:cursor-wait disabled:opacity-70"
-          >
-            {isBusy ? "저장 중..." : "저장하기"}
-          </button>
+          </section>
         </form>
       </div>
     </div>

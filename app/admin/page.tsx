@@ -47,6 +47,8 @@ type MagazineChartItem = {
 
 type ToonbtiFieldKey = "mood_tags" | "episode_formats" | "style_tags" | "topic_tags";
 
+const ADMIN_ARTISTS_PER_PAGE = 20;
+
 async function requestArtistStats(period: ArtistStatsPeriod) {
   const response = await fetch(`/api/artist-events?period=${period}`, { cache: "no-store" });
   const data = (await response.json()) as { stats?: ArtistStatsSummary[]; message?: string };
@@ -339,6 +341,7 @@ export default function AdminPage() {
   const [artistSearch, setArtistSearch] = useState("");
   const [showAllArtistStats, setShowAllArtistStats] = useState(false);
   const [showAllSearchQueries, setShowAllSearchQueries] = useState(false);
+  const [artistPage, setArtistPage] = useState(1);
 
   const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -802,10 +805,13 @@ export default function AdminPage() {
   const sortedArtists = useMemo(
     () =>
       [...artists].sort((a, b) => {
-        if (a.is_ad !== b.is_ad) {
-          return Number(b.is_ad) - Number(a.is_ad);
+        const createdAtDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
+        if (Number.isNaN(createdAtDiff) || createdAtDiff === 0) {
+          return a.name.localeCompare(b.name, "ko");
         }
-        return a.sort_order - b.sort_order;
+
+        return createdAtDiff;
       }),
     [artists]
   );
@@ -833,6 +839,17 @@ export default function AdminPage() {
       return searchable.includes(query);
     });
   }, [artistSearch, sortedArtists]);
+
+  useEffect(() => {
+    setArtistPage(1);
+  }, [artistSearch, activeTab]);
+
+  const totalArtistPages = Math.max(1, Math.ceil(filteredSortedArtists.length / ADMIN_ARTISTS_PER_PAGE));
+  const safeArtistPage = Math.min(artistPage, totalArtistPages);
+  const paginatedArtists = useMemo(() => {
+    const start = (safeArtistPage - 1) * ADMIN_ARTISTS_PER_PAGE;
+    return filteredSortedArtists.slice(start, start + ADMIN_ARTISTS_PER_PAGE);
+  }, [filteredSortedArtists, safeArtistPage]);
 
   const sortedMagazines = useMemo(
     () =>
@@ -880,7 +897,7 @@ export default function AdminPage() {
   }, [artistStats, sortedArtists]);
 
   const artistChartItems = useMemo(
-    () => allArtistChartItems.slice(0, showAllArtistStats ? allArtistChartItems.length : 8),
+    () => allArtistChartItems.slice(0, showAllArtistStats ? allArtistChartItems.length : 5),
     [allArtistChartItems, showAllArtistStats]
   );
 
@@ -890,7 +907,7 @@ export default function AdminPage() {
   );
 
   const topSearchQueries = useMemo(
-    () => searchQueries.slice(0, showAllSearchQueries ? searchQueries.length : 10),
+    () => searchQueries.slice(0, showAllSearchQueries ? searchQueries.length : 5),
     [searchQueries, showAllSearchQueries]
   );
 
@@ -1031,7 +1048,7 @@ export default function AdminPage() {
 
           <section className="mt-6">
             <ArtistStatsChart items={artistChartItems} period={statsPeriod} />
-            {allArtistChartItems.length > 8 ? (
+            {allArtistChartItems.length > 5 ? (
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
@@ -1087,7 +1104,7 @@ export default function AdminPage() {
               </div>
             )}
 
-            {searchQueries.length > 10 ? (
+            {searchQueries.length > 5 ? (
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
@@ -1182,20 +1199,58 @@ export default function AdminPage() {
             ))}
           </div>
         ) : activeTab === "artists" ? (
-          <ArtistTable
-            artists={filteredSortedArtists}
-            statsByArtistId={artistStats}
-            statsPeriod={statsPeriod}
-            onEdit={(artist) => {
-              setSelectedArtist(artist);
-              setArtistFormOpen(true);
-            }}
-            onDelete={deleteArtist}
-            onToggleAd={toggleAd}
-            onToggleHot={toggleHot}
-            onReorder={reorderArtists}
-            isSaving={saving}
-          />
+          <>
+            <div className="mb-3 flex flex-col gap-1 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
+              <span>
+                최신 등록순 ·{" "}
+                {filteredSortedArtists.length > 0
+                  ? `${formatNumber(filteredSortedArtists.length)}명 중 ${formatNumber(
+                      (safeArtistPage - 1) * ADMIN_ARTISTS_PER_PAGE + 1
+                    )}-${formatNumber(
+                      Math.min(safeArtistPage * ADMIN_ARTISTS_PER_PAGE, filteredSortedArtists.length)
+                    )}명 표시`
+                  : "표시할 작가 없음"}
+              </span>
+              <span>페이지당 {ADMIN_ARTISTS_PER_PAGE}명</span>
+            </div>
+            <ArtistTable
+              artists={paginatedArtists}
+              statsByArtistId={artistStats}
+              statsPeriod={statsPeriod}
+              onEdit={(artist) => {
+                setSelectedArtist(artist);
+                setArtistFormOpen(true);
+              }}
+              onDelete={deleteArtist}
+              onToggleAd={toggleAd}
+              onToggleHot={toggleHot}
+              onReorder={reorderArtists}
+              isSaving={saving}
+              reorderEnabled={false}
+            />
+            {totalArtistPages > 1 ? (
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                {Array.from({ length: totalArtistPages }).map((_, index) => {
+                  const page = index + 1;
+
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setArtistPage(page)}
+                      className={`h-10 min-w-10 rounded-full border px-3 text-sm font-semibold transition ${
+                        safeArtistPage === page
+                          ? "border-coral bg-coral text-white"
+                          : "border-slate-200 bg-white text-slate-500 hover:border-ink hover:text-ink"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </>
         ) : activeTab === "magazines" ? (
           <MagazineTable
             magazines={sortedMagazines}

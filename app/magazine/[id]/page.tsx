@@ -15,8 +15,15 @@ type MagazineDetailPageProps = {
 
 type ContentBlock =
   | { type: "paragraph"; value: string }
-  | { type: "text"; value: string; size: "body" | "large"; align: "left" | "center" | "right" }
-  | { type: "image"; url: string; size: "wide" | "medium" };
+  | {
+      type: "text";
+      value: string;
+      size: "small" | "body" | "large" | "title";
+      align: "left" | "center" | "right";
+      bold: boolean;
+    }
+  | { type: "image"; url: string; size: "wide" | "medium" }
+  | { type: "divider" };
 
 function sortArtistsByIds(artists: Artist[], ids: string[]) {
   const orderMap = new Map(ids.map((id, index) => [id, index]));
@@ -25,7 +32,8 @@ function sortArtistsByIds(artists: Artist[], ids: string[]) {
 
 function parseContent(content: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
-  const tokenRegex = /\{\{(image|text):(.+?)\|(wide|medium|body|large)(?:\|(left|center|right))?\}\}/g;
+  const tokenRegex =
+    /\{\{divider\}\}|\{\{(image|text):(.+?)\|(wide|medium|small|body|large|title)(?:\|(left|center|right))?(?:\|(bold|normal))?\}\}/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -36,7 +44,9 @@ function parseContent(content: string): ContentBlock[] {
       blocks.push({ type: "paragraph", value: before });
     }
 
-    if (match[1] === "image") {
+    if (match[0] === "{{divider}}") {
+      blocks.push({ type: "divider" });
+    } else if (match[1] === "image") {
       blocks.push({
         type: "image",
         url: match[2],
@@ -46,8 +56,9 @@ function parseContent(content: string): ContentBlock[] {
       blocks.push({
         type: "text",
         value: match[2],
-        size: match[3] as "body" | "large",
-        align: (match[4] as "left" | "center" | "right" | undefined) ?? "left"
+        size: match[3] as "small" | "body" | "large" | "title",
+        align: (match[4] as "left" | "center" | "right" | undefined) ?? "left",
+        bold: match[5] === "bold"
       });
     }
 
@@ -66,16 +77,22 @@ function AdSidebarPlaceholder() {
   return <div className="sticky top-20 min-h-[600px] w-[160px] rounded-lg bg-gray-100/40" />;
 }
 
-function getTextBlockClass(size: "body" | "large", align: "left" | "center" | "right") {
-  const sizeClass =
-    size === "large"
-      ? "text-[26px] font-extrabold leading-[1.35] tracking-[-0.04em] text-[#1a1a1a] md:text-[34px]"
-      : "text-[15px] leading-8 text-slate-700";
+function getTextBlockClass(
+  size: "small" | "body" | "large" | "title",
+  align: "left" | "center" | "right",
+  bold: boolean
+) {
+  const sizeClass = {
+    small: "text-[13px] leading-7 text-slate-500",
+    body: "text-[15px] leading-8 text-slate-700",
+    large: "text-[22px] leading-[1.45] tracking-[-0.03em] text-[#1a1a1a] md:text-[28px]",
+    title: "text-[30px] leading-[1.25] tracking-[-0.04em] text-[#1a1a1a] md:text-[42px]"
+  }[size];
 
   const alignClass =
     align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
 
-  return `${sizeClass} ${alignClass}`;
+  return `${sizeClass} ${bold || size === "title" ? "font-extrabold" : ""} ${alignClass}`;
 }
 
 function formatFollowerCount(value: number) {
@@ -169,9 +186,17 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
                   return (
                     <div
                       key={`text-${index}`}
-                      className={getTextBlockClass(block.size, block.align)}
+                      className={getTextBlockClass(block.size, block.align, block.bold)}
                     >
                       <p className="whitespace-pre-wrap">{block.value}</p>
+                    </div>
+                  );
+                }
+
+                if (block.type === "divider") {
+                  return (
+                    <div key={`divider-${index}`} className="py-4">
+                      <div className="h-px w-full bg-slate-200" />
                     </div>
                   );
                 }
