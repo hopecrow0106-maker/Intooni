@@ -50,20 +50,26 @@ function formatFollowerCount(value: number) {
   return new Intl.NumberFormat("ko-KR").format(value);
 }
 
+function shuffleItems<T>(items: T[]) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
 function createRandomOrderMap(artists: Artist[]) {
-  return [...artists]
-    .sort(() => Math.random() - 0.5)
-    .reduce<Record<string, number>>((acc, artist, index) => {
-      acc[artist.id] = index;
-      return acc;
-    }, {});
+  return shuffleItems(artists).reduce<Record<string, number>>((acc, artist, index) => {
+    acc[artist.id] = index;
+    return acc;
+  }, {});
 }
 
 function pickHeroDecorations(artists: Artist[]): HeroDecoration[] {
-  const selected = [...artists]
-    .filter((artist) => artist.character_url.trim())
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 4);
+  const selected = shuffleItems(artists.filter((artist) => artist.character_url.trim())).slice(0, 4);
 
   return selected.map((artist, index) => ({
     artist,
@@ -190,6 +196,7 @@ export default function HomePage() {
   const lastLoggedSearchRef = useRef("");
   const searchResultsRef = useRef<HTMLElement | null>(null);
 
+  const hasTextSearch = search.trim().length > 0;
   const isSearching = search.trim().length > 0 || activeGenres.length > 0 || activeFollowerRanges.length > 0;
 
   const trackArtistEvent = (artistId: string, eventType: "profile_click" | "hero_click") => {
@@ -223,7 +230,11 @@ export default function HomePage() {
         await Promise.all([
           supabase.from("categories").select("*").order("sort_order", { ascending: true }),
           supabase.from("artists").select("id, genre"),
-          supabase.from("magazines").select("*").order("published_at", { ascending: false }),
+          supabase
+            .from("magazines")
+            .select("*")
+            .eq("is_public", true)
+            .order("published_at", { ascending: false }),
           supabase
             .from("artists")
             .select("*")
@@ -367,7 +378,29 @@ export default function HomePage() {
     return items;
   }, [artistCount, categories, genreCounts]);
 
-  const featuredMagazines = useMemo(() => magazines.slice(0, 3), [magazines]);
+  const featuredMagazines = useMemo(() => magazines.slice(0, 4), [magazines]);
+
+  const searchExamples = useMemo(() => {
+    const tags = allArtists.flatMap((artist) => [...artist.hashtags, ...artist.hidden_tags]);
+    const uniqueTags = [...new Set(tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean))];
+    return shuffleItems(uniqueTags);
+  }, [allArtists]);
+
+  const filteredMagazines = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return [];
+    }
+
+    return magazines.filter((magazine) => {
+      return (
+        magazine.title.toLowerCase().includes(query) ||
+        magazine.tag.toLowerCase().includes(query) ||
+        magazine.content.toLowerCase().includes(query)
+      );
+    });
+  }, [magazines, search]);
 
   const featuredNewArtists = useMemo(
     () =>
@@ -425,7 +458,7 @@ export default function HomePage() {
   );
 
   useEffect(() => {
-    if (!isSearching || loading || searchLoading || visibleArtists.length === 0) {
+    if (!hasTextSearch || loading || searchLoading) {
       return;
     }
 
@@ -437,7 +470,7 @@ export default function HomePage() {
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [isSearching, loading, searchLoading, visibleArtists.length]);
+  }, [hasTextSearch, loading, searchLoading, visibleArtists.length, filteredMagazines.length]);
 
   const regularVisibleArtists = useMemo(
     () =>
@@ -455,7 +488,11 @@ export default function HomePage() {
     [visibleArtists]
   );
 
-  const visibleCountLabel = isSearching ? filteredArtists.length : artistCount;
+  const visibleCountLabel = hasTextSearch
+    ? filteredArtists.length + filteredMagazines.length
+    : isSearching
+      ? filteredArtists.length
+      : artistCount;
   const showLoadingState = loading || searchLoading;
 
   return (
@@ -467,7 +504,23 @@ export default function HomePage() {
         >
           인투<span className="text-[#1a1a1a]">니</span>
         </a>
-        <SearchBar value={search} onChange={setSearch} />
+        <SearchBar value={search} onChange={setSearch} examples={searchExamples} />
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <Link
+            href="/toonbti"
+            aria-label="툰비티아이 테스트하러 가기"
+            className="rounded-full bg-[#ff4d6d] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(255,77,109,0.18)] transition hover:bg-[#e83a5a]"
+          >
+            나랑 맞는 작가는?
+          </Link>
+          <Link
+            href="/toonbti"
+            className="relative hidden rounded-full border border-[#ffd6df] bg-white px-3 py-2 text-xs font-bold text-[#ff4d6d] shadow-[0_10px_26px_rgba(255,77,109,0.12)] transition hover:-translate-y-0.5 hover:border-[#ff4d6d] lg:inline-flex"
+          >
+            <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-b border-l border-[#ffd6df] bg-white" />
+            지금 바로 테스트하러 고고!
+          </Link>
+        </div>
       </nav>
 
       <main className="mx-auto w-full max-w-[1520px] xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
@@ -704,7 +757,7 @@ export default function HomePage() {
                   더보기 →
                 </Link>
               </div>
-              <div className="trending-row">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {featuredMagazines.map((magazine) => (
                   <Link
                     key={magazine.id}
@@ -790,7 +843,7 @@ export default function HomePage() {
                   <ArtistSkeletonCard key={index} />
                 ))}
               </div>
-            ) : filteredArtists.length === 0 ? (
+            ) : filteredArtists.length === 0 && (!hasTextSearch || filteredMagazines.length === 0) ? (
               <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white px-6 py-14 text-center">
                 <span className="mb-3 text-5xl">🔍</span>
                 <p className="text-base font-bold tracking-[-0.02em] text-[#1a1a1a]">
@@ -802,6 +855,44 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="space-y-8">
+                {hasTextSearch && filteredMagazines.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold tracking-[-0.02em] text-[#1a1a1a]">
+                        매거진
+                      </h3>
+                      <span className="text-sm text-[#a0a0a0]">{filteredMagazines.length}개</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {filteredMagazines.map((magazine) => (
+                        <Link
+                          key={magazine.id}
+                          href={`/magazine/${magazine.id}`}
+                          className="magazine-card block"
+                        >
+                          <div className="relative aspect-[2/1] overflow-hidden bg-[#f2f0ec]">
+                            <Image
+                              src={magazine.thumbnail_url || MAGAZINE_RECT_PLACEHOLDER}
+                              alt={magazine.title}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw"
+                            />
+                          </div>
+                          <div className="magazine-card-info">
+                            {magazine.tag ? (
+                              <p className="mb-2 text-[11px] font-semibold text-[#c9153d]">
+                                {magazine.tag}
+                              </p>
+                            ) : null}
+                            <p className="magazine-card-title line-clamp-2">{magazine.title}</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 {regularVisibleArtists.length > 0 ? (
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                     {regularVisibleArtists.map((artist, index) => (

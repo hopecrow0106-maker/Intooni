@@ -94,6 +94,7 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
     .from("magazines")
     .select("*")
     .eq("id", params.id)
+    .eq("is_public", true)
     .single();
 
   if (magazineError || !magazine) {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getErrorMessage } from "@/lib/api-error";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { getErrorMessage } from "@/lib/api-error";
 import { getSupabaseAdminClient, getSupabasePublicServerClient } from "@/lib/supabase";
 import type { MagazineInsert } from "@/lib/types";
 
@@ -22,12 +22,20 @@ function extractStoragePath(publicUrl: string) {
 
 export async function GET() {
   try {
-    const supabase = getSupabasePublicServerClient();
-    const { data, error } = await supabase
+    const isAdmin = isAdminAuthenticated();
+    const supabase = isAdmin ? getSupabaseAdminClient() : getSupabasePublicServerClient();
+
+    let query = supabase
       .from("magazines")
       .select("*")
       .order("published_at", { ascending: false })
       .order("created_at", { ascending: false });
+
+    if (!isAdmin) {
+      query = query.eq("is_public", true);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw error;
@@ -52,11 +60,7 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as MagazineInsert;
     payload.instagram_urls = (payload.instagram_urls ?? []).slice(0, 4);
 
-    const { data, error } = await supabase
-      .from("magazines")
-      .insert(payload)
-      .select()
-      .single();
+    const { data, error } = await supabase.from("magazines").insert(payload).select().single();
 
     if (error) {
       throw error;
@@ -106,10 +110,7 @@ export async function PUT(request: Request) {
       throw error;
     }
 
-    if (
-      existingMagazine?.thumbnail_url &&
-      existingMagazine.thumbnail_url !== payload.thumbnail_url
-    ) {
+    if (existingMagazine?.thumbnail_url && existingMagazine.thumbnail_url !== payload.thumbnail_url) {
       const oldPath = extractStoragePath(existingMagazine.thumbnail_url);
       if (oldPath) {
         await supabase.storage.from("artist-images").remove([oldPath]);

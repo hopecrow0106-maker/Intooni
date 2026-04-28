@@ -53,6 +53,7 @@ export type Magazine = {
   related_artist_ids: string[];
   instagram_urls: string[];
   view_count: number;
+  is_public: boolean;
   published_at: string;
   created_at: string;
 };

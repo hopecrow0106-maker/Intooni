@@ -78,9 +78,13 @@ create table if not exists public.magazines (
   related_artist_ids uuid[] not null default '{}',
   instagram_urls text[] not null default '{}',
   view_count integer not null default 0,
+  is_public boolean not null default true,
   published_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
+
+alter table public.magazines
+add column if not exists is_public boolean not null default true;
 
 create table if not exists public.artist_event_logs (
   id uuid primary key default gen_random_uuid(),

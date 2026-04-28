@@ -8,6 +8,7 @@ export default async function MagazineListPage() {
   const { data: magazines } = await supabase
     .from("magazines")
     .select("*")
+    .eq("is_public", true)
     .order("published_at", { ascending: false });
 
   const items = magazines ?? [];

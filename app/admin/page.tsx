@@ -7,6 +7,7 @@ import { ArtistForm, type ArtistFormValues } from "@/components/admin/ArtistForm
 import { ArtistTable } from "@/components/admin/ArtistTable";
 import { MagazineForm, type MagazineFormValues } from "@/components/admin/MagazineForm";
 import { MagazineTable } from "@/components/admin/MagazineTable";
+import { ToonbtiTagManager } from "@/components/admin/ToonbtiTagManager";
 import {
   type ArtistStatsPeriod,
   type ArtistStatsSummary
@@ -20,7 +21,7 @@ type DebugError = {
   message: string;
 };
 
-type AdminTab = "artists" | "magazines";
+type AdminTab = "artists" | "magazines" | "toonbti";
 
 type SearchQuerySummary = {
   query: string;
@@ -43,6 +44,8 @@ type MagazineChartItem = {
   title: string;
   views: number;
 };
+
+type ToonbtiFieldKey = "mood_tags" | "episode_formats" | "style_tags" | "topic_tags";
 
 async function requestArtistStats(period: ArtistStatsPeriod) {
   const response = await fetch(`/api/artist-events?period=${period}`, { cache: "no-store" });
@@ -527,6 +530,112 @@ export default function AdminPage() {
     }
   };
 
+  const bulkUpdateToonbtiTag = async (
+    field: ToonbtiFieldKey,
+    from: string,
+    to: string
+  ) => {
+    const source = from.trim();
+    const target = to.trim();
+
+    if (!source || !target || source === target) {
+      return;
+    }
+
+    const matchedArtists = artists.filter((artist) => artist[field].includes(source));
+    if (matchedArtists.length === 0) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await Promise.all(
+        matchedArtists.map(async (artist) => {
+          const nextValues = artist[field].map((item) => (item === source ? target : item));
+          const deduped = [...new Set(nextValues.filter(Boolean))];
+
+          const response = await fetch("/api/artists", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...artist,
+              [field]: deduped
+            })
+          });
+
+          const data = (await response.json()) as { message?: string };
+          if (!response.ok) {
+            throw new Error(data.message ?? "툰비티아이 태그 일괄 수정에 실패했습니다.");
+          }
+        })
+      );
+
+      clearDebugErrors();
+      await fetchArtists();
+    } catch (error) {
+      pushDebugError({
+        action: "툰비티아이 태그 일괄 수정",
+        source: "app/admin/page.tsx > bulkUpdateToonbtiTag",
+        endpoint: "/api/artists",
+        message:
+          error instanceof Error ? error.message : "툰비티아이 태그 일괄 수정에 실패했습니다."
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const bulkDeleteToonbtiTag = async (field: ToonbtiFieldKey, value: string) => {
+    const source = value.trim();
+    if (!source) {
+      return;
+    }
+
+    const matchedArtists = artists.filter((artist) => artist[field].includes(source));
+    if (matchedArtists.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(`"${source}" 값을 전체 작가에서 삭제할까요?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await Promise.all(
+        matchedArtists.map(async (artist) => {
+          const response = await fetch("/api/artists", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...artist,
+              [field]: artist[field].filter((item) => item !== source)
+            })
+          });
+
+          const data = (await response.json()) as { message?: string };
+          if (!response.ok) {
+            throw new Error(data.message ?? "툰비티아이 태그 전체 삭제에 실패했습니다.");
+          }
+        })
+      );
+
+      clearDebugErrors();
+      await fetchArtists();
+    } catch (error) {
+      pushDebugError({
+        action: "툰비티아이 태그 전체 삭제",
+        source: "app/admin/page.tsx > bulkDeleteToonbtiTag",
+        endpoint: "/api/artists",
+        message:
+          error instanceof Error ? error.message : "툰비티아이 태그 전체 삭제에 실패했습니다."
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteArtist = async (artist: Artist) => {
     const confirmed = window.confirm(`${artist.name} 작가를 삭제할까요?`);
     if (!confirmed) {
@@ -855,6 +964,13 @@ export default function AdminPage() {
         >
           매거진 관리
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("toonbti")}
+          className={`pill-button ${activeTab === "toonbti" ? "pill-button-active" : ""}`}
+        >
+          툰비티아이 관리
+        </button>
       </section>
 
       {activeTab === "artists" ? (
@@ -983,8 +1099,9 @@ export default function AdminPage() {
               </div>
             ) : null}
           </section>
+
         </>
-      ) : (
+      ) : activeTab === "magazines" ? (
         <>
           <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatsCard label="전체 매거진" value={formatNumber(sortedMagazines.length)} />
@@ -1019,6 +1136,20 @@ export default function AdminPage() {
             <MagazineViewsChart items={magazineChartItems} />
           </section>
         </>
+      ) : (
+        <section className="mt-6">
+          <ToonbtiTagManager
+            artists={sortedArtists}
+            saving={saving}
+            onBulkReplace={bulkUpdateToonbtiTag}
+            onBulkDelete={bulkDeleteToonbtiTag}
+            onOpenArtist={(artist) => {
+              setActiveTab("artists");
+              setSelectedArtist(artist);
+              setArtistFormOpen(true);
+            }}
+          />
+        </section>
       )}
 
       {isDevelopment && debugErrors.length > 0 && (
@@ -1065,7 +1196,7 @@ export default function AdminPage() {
             onReorder={reorderArtists}
             isSaving={saving}
           />
-        ) : (
+        ) : activeTab === "magazines" ? (
           <MagazineTable
             magazines={sortedMagazines}
             onEdit={(magazine) => {
@@ -1075,25 +1206,27 @@ export default function AdminPage() {
             onDelete={deleteMagazine}
             isSaving={saving}
           />
-        )}
+        ) : null}
       </section>
 
-      <button
-        type="button"
-        onClick={() => {
-          if (activeTab === "artists") {
-            setSelectedArtist(null);
-            setArtistFormOpen(true);
-            return;
-          }
+      {activeTab !== "toonbti" ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (activeTab === "artists") {
+              setSelectedArtist(null);
+              setArtistFormOpen(true);
+              return;
+            }
 
-          setSelectedMagazine(null);
-          setMagazineFormOpen(true);
-        }}
-        className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-coral text-4xl font-light text-white shadow-[0_20px_40px_rgba(255,118,74,0.35)] transition hover:scale-105"
-      >
-        +
-      </button>
+            setSelectedMagazine(null);
+            setMagazineFormOpen(true);
+          }}
+          className="fixed bottom-6 right-6 z-40 flex h-16 w-16 items-center justify-center rounded-full bg-coral text-4xl font-light text-white shadow-[0_20px_40px_rgba(255,118,74,0.35)] transition hover:scale-105"
+        >
+          +
+        </button>
+      ) : null}
 
       <ArtistForm
         isOpen={artistFormOpen}

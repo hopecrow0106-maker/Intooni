@@ -52,9 +52,14 @@ export function MagazineTable({
               <p className="text-sm text-slate-500">
                 {magazine.tag || "태그 없음"} · {formatDate(magazine.published_at)}
               </p>
-              <p className="mt-1 text-xs font-medium text-slate-400">
-                👁️ 조회수 {formatNumber(magazine.view_count)}
-              </p>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs font-medium">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">
+                  {magazine.is_public ? "전체공개" : "비공개"}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">
+                  조회수 {formatNumber(magazine.view_count)}
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
