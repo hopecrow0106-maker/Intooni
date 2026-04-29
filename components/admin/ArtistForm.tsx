@@ -214,6 +214,7 @@ export function ArtistForm({
 
   const formId = "artist-admin-form";
   const isBusy = saving || uploading.thumbnail || uploading.character || categoryBusy;
+  const primaryPreviewUrl = form.gallery_post_urls[0]?.trim() ?? "";
 
   const uploadFile = async (file: File, folder = "artists") => {
     const formData = new FormData();
@@ -400,7 +401,7 @@ export function ArtistForm({
   return (
     <div className="fixed inset-0 z-50 bg-ink/50" onClick={onClose}>
       <div
-        className="absolute inset-x-0 bottom-0 h-[94vh] overflow-y-auto rounded-t-[32px] bg-[#fffdf9] p-5 shadow-[0_-24px_70px_rgba(16,24,40,0.24)] md:left-auto md:right-6 md:top-6 md:h-auto md:max-h-[calc(100vh-3rem)] md:w-[720px] md:rounded-[32px]"
+        className="absolute inset-x-0 bottom-0 h-[94vh] overflow-y-auto rounded-t-[32px] bg-[#fffdf9] p-5 shadow-[0_-24px_70px_rgba(16,24,40,0.24)] md:left-auto md:right-6 md:top-6 md:h-auto md:max-h-[calc(100vh-3rem)] md:w-[720px] md:rounded-[32px] xl:w-[1120px]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-6 flex items-center justify-between gap-3">
@@ -429,26 +430,27 @@ export function ArtistForm({
           </div>
         </div>
 
-        <form
-          id={formId}
-          className="space-y-5"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setFormMessage("");
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,720px)_minmax(300px,1fr)]">
+          <form
+            id={formId}
+            className="space-y-5"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setFormMessage("");
 
-            await onSave({
-              ...form,
-              instagram_handle: form.instagram_handle.replace(/^@/, ""),
-              hashtags: form.hashtags.map((tag) => tag.trim()).filter(Boolean),
-              hidden_tags: form.hidden_tags.map((tag) => tag.trim()).filter(Boolean),
-              mood_tags: form.mood_tags.map((tag) => tag.trim()).filter(Boolean),
-              episode_formats: form.episode_formats.map((tag) => tag.trim()).filter(Boolean),
-              style_tags: form.style_tags.map((tag) => tag.trim()).filter(Boolean),
-              topic_tags: form.topic_tags.map((tag) => tag.trim()).filter(Boolean),
-              gallery_post_urls: form.gallery_post_urls.map((url) => url.trim()).filter(Boolean)
-            });
-          }}
-        >
+              await onSave({
+                ...form,
+                instagram_handle: form.instagram_handle.replace(/^@/, ""),
+                hashtags: form.hashtags.map((tag) => tag.trim()).filter(Boolean),
+                hidden_tags: form.hidden_tags.map((tag) => tag.trim()).filter(Boolean),
+                mood_tags: form.mood_tags.map((tag) => tag.trim()).filter(Boolean),
+                episode_formats: form.episode_formats.map((tag) => tag.trim()).filter(Boolean),
+                style_tags: form.style_tags.map((tag) => tag.trim()).filter(Boolean),
+                topic_tags: form.topic_tags.map((tag) => tag.trim()).filter(Boolean),
+                gallery_post_urls: form.gallery_post_urls.map((url) => url.trim()).filter(Boolean)
+              });
+            }}
+          >
           {formMessage ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {formMessage}
@@ -910,7 +912,32 @@ export function ArtistForm({
           >
             {isBusy ? "저장 중.." : "저장하기"}
           </button>
-        </form>
+          </form>
+
+          <aside className="hidden xl:block">
+            <div className="sticky top-0 space-y-3 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-700">통계 참고용 게시물</p>
+                <p className="text-xs leading-5 text-slate-400">
+                  갤러리 게시물 링크 1번을 옆에 고정해서 보여줍니다. 팔로워/게시물 수 수정할 때
+                  참고하세요.
+                </p>
+              </div>
+
+              {primaryPreviewUrl ? (
+                <InstagramEmbed
+                  url={primaryPreviewUrl}
+                  compact
+                  className="min-h-[420px] rounded-[24px] border border-slate-200 bg-white"
+                />
+              ) : (
+                <div className="flex min-h-[420px] items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-6 text-center text-sm leading-6 text-slate-400">
+                  갤러리 게시물 링크 1번을 입력하면 여기에 인스타 게시물이 표시됩니다.
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );

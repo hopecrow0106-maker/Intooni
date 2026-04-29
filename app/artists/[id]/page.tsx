@@ -49,6 +49,51 @@ function getArtistSlug(artist: { id: string; instagram_handle: string }) {
   return encodeURIComponent(handle || artist.id);
 }
 
+function normalizeKeyword(value: string) {
+  return value.replace(/^#/, "").trim();
+}
+
+function uniqueKeywords(values: string[]) {
+  return Array.from(new Set(values.map(normalizeKeyword).filter(Boolean)));
+}
+
+function joinKoreanList(values: string[], fallback: string) {
+  const keywords = uniqueKeywords(values).slice(0, 6);
+  return keywords.length > 0 ? keywords.join(", ") : fallback;
+}
+
+function buildArtistSeoDescription(artist: {
+  name: string;
+  instagram_handle: string;
+  genre: string;
+  bio: string;
+  hashtags: string[];
+  hidden_tags: string[];
+  mood_tags: string[];
+  episode_formats: string[];
+  style_tags: string[];
+  topic_tags: string[];
+}) {
+  const handle = artist.instagram_handle.replace(/^@/, "").trim();
+  const visibleKeywords = uniqueKeywords([
+    ...artist.hashtags,
+    ...artist.topic_tags,
+    ...artist.style_tags,
+    ...artist.mood_tags
+  ]);
+  const hiddenKeywords = uniqueKeywords(artist.hidden_tags);
+  const searchKeywords = joinKoreanList([...visibleKeywords, ...hiddenKeywords], artist.genre);
+  const styleKeywords = joinKoreanList([...artist.style_tags, ...artist.mood_tags], artist.genre);
+  const topicKeywords = joinKoreanList([...artist.topic_tags, ...artist.hashtags], artist.genre);
+  const bio = artist.bio.trim();
+
+  if (bio) {
+    return `${artist.name}는 ${bio} 인스타툰 작가입니다. ${searchKeywords} 같은 키워드로 찾는 분들에게 추천되며, 인스타 아이디는 @${handle}입니다.`;
+  }
+
+  return `${artist.name}는 ${styleKeywords} 분위기와 ${topicKeywords} 주제를 다루는 ${artist.genre} 인스타툰 작가입니다. 인스타 아이디는 @${handle}이며, 인투니에서 ${searchKeywords} 같은 해시태그와 키워드로 쉽게 찾을 수 있습니다.`;
+}
+
 async function getArtistBySlug(slug: string) {
   const supabase = getSupabasePublicServerClient();
   const normalizedSlug = normalizeArtistSlug(slug);
@@ -95,12 +140,7 @@ export async function generateMetadata({
     };
   }
 
-  const hashtags = artist.hashtags.slice(0, 4).join(" ");
-  const description =
-    artist.memo.trim() ||
-    `${artist.genre} 작가 ${artist.name}. 팔로워 ${formatCount(artist.followers)}, 게시물 ${formatCount(
-      artist.post_count
-    )}. ${hashtags}`.trim();
+  const description = buildArtistSeoDescription(artist);
 
   const image = artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER;
   const artistSlug = getArtistSlug(artist);
@@ -153,6 +193,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
 
   const galleryPostUrls = artist.gallery_post_urls.filter((url) => url.trim());
   const fallbackInstagramUrl = galleryPostUrls[0];
+  const seoDescription = buildArtistSeoDescription(artist);
 
   return (
     <main className="mx-auto w-full max-w-[1520px] px-4 py-8 md:px-6 md:py-12 xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
@@ -253,6 +294,11 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                   </p>
                 </div>
               )}
+
+              <section className="rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white px-4 py-4">
+                <h2 className="text-sm font-bold text-[#1a1a1a]">작가 소개</h2>
+                <p className="mt-2 text-sm leading-7 text-[#4b4b4b]">{seoDescription}</p>
+              </section>
             </div>
           </div>
 
