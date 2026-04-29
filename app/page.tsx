@@ -1202,7 +1202,7 @@ export default function HomePage() {
           }}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-[32px] border border-[#c9efff] bg-white shadow-[0_28px_90px_rgba(36,114,141,0.22)] md:max-w-3xl"
+            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[32px] border border-[#c9efff] bg-white shadow-[0_28px_90px_rgba(36,114,141,0.22)] md:max-w-3xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="relative overflow-hidden bg-gradient-to-br from-[#e5f8ff] via-white to-[#fff7f8] px-6 py-7">
@@ -1230,7 +1230,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="space-y-5 px-6 py-6 md:grid md:grid-cols-[1fr_280px] md:gap-6 md:space-y-0">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 md:grid md:grid-cols-[1fr_280px] md:gap-6 md:space-y-0 md:px-6 md:py-6">
               <div>
                 <p className="mb-3 text-sm font-bold text-[#1a1a1a]">어떤 카테고리에서 찾을까요?</p>
                 <div className="flex flex-wrap gap-2">
@@ -1256,9 +1256,9 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-[28px] border border-[#dff5ff] bg-[#f7fcff] px-5 py-5 text-center md:row-span-2">
+              <div className="overflow-hidden rounded-[28px] border border-[#dff5ff] bg-[#f7fcff] px-4 py-4 text-center md:row-span-2 md:px-5 md:py-5">
                 {randomPickedArtist && !randomRolling ? (
-                  <div className="mx-auto mb-4 w-full max-w-[220px] overflow-hidden rounded-[24px] border border-[#dff5ff] bg-white shadow-[0_16px_32px_rgba(36,114,141,0.12)] md:max-w-[240px]">
+                  <div className="mx-auto mb-3 w-full max-w-[150px] overflow-hidden rounded-[20px] border border-[#dff5ff] bg-white shadow-[0_16px_32px_rgba(36,114,141,0.12)] sm:max-w-[190px] md:mb-4 md:max-w-[240px] md:rounded-[24px]">
                     {randomPickedArtist.thumbnail_url ? (
                       <div className="relative aspect-square bg-[#f2f0ec]">
                         <Image
@@ -1274,7 +1274,7 @@ export default function HomePage() {
                         <InstagramEmbed
                           url={getFallbackInstagramUrl(randomPickedArtist)}
                           compact
-                          className="min-h-[150px] rounded-[18px] border border-[rgba(0,0,0,0.08)] md:min-h-[220px]"
+                          className="max-h-[170px] min-h-[120px] rounded-[16px] border border-[rgba(0,0,0,0.08)] md:max-h-none md:min-h-[220px] md:rounded-[18px]"
                         />
                       </div>
                     ) : (
@@ -1303,7 +1303,7 @@ export default function HomePage() {
                     {randomRollingName || randomPickedArtist?.name || "누가 나올까요?"}
                   </p>
                 </div>
-                <p className="mt-3 text-xs font-semibold text-[#8a8a8a]">
+                <p className="mt-2 text-xs font-semibold text-[#8a8a8a] md:mt-3">
                   {randomRolling
                     ? "차르르르륵... 고르는 중"
                     : randomPickedArtist
@@ -1312,7 +1312,7 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 self-end sm:flex-row md:col-start-1">
+              <div className="sticky bottom-0 z-10 -mx-5 flex flex-col gap-2 self-end border-t border-[#dff5ff] bg-white/95 px-5 py-3 backdrop-blur sm:flex-row md:static md:col-start-1 md:mx-0 md:border-t-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-0">
                 <button
                   type="button"
                   onClick={startRandomPick}
