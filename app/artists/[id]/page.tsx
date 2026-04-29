@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { ARTIST_SQUARE_PLACEHOLDER } from "@/lib/placeholders";
@@ -34,9 +34,48 @@ function AdSidebarPlaceholder() {
   );
 }
 
-async function getArtist(id: string) {
+function normalizeArtistSlug(value: string) {
+  return decodeURIComponent(value).replace(/^@/, "").trim();
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
+function getArtistSlug(artist: { id: string; instagram_handle: string }) {
+  const handle = artist.instagram_handle.replace(/^@/, "").trim();
+  return encodeURIComponent(handle || artist.id);
+}
+
+async function getArtistBySlug(slug: string) {
   const supabase = getSupabasePublicServerClient();
-  const { data, error } = await supabase.from("artists").select("*").eq("id", id).single();
+  const normalizedSlug = normalizeArtistSlug(slug);
+
+  const { data: artistByHandle, error: handleError } = await supabase
+    .from("artists")
+    .select("*")
+    .eq("instagram_handle", normalizedSlug)
+    .maybeSingle();
+
+  if (artistByHandle) {
+    return artistByHandle;
+  }
+
+  if (!handleError && !isUuid(normalizedSlug)) {
+    return null;
+  }
+
+  if (!isUuid(normalizedSlug)) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("artists")
+    .select("*")
+    .eq("id", normalizedSlug)
+    .maybeSingle();
 
   if (error || !data) {
     return null;
@@ -48,7 +87,7 @@ async function getArtist(id: string) {
 export async function generateMetadata({
   params
 }: ArtistDetailPageProps): Promise<Metadata> {
-  const artist = await getArtist(params.id);
+  const artist = await getArtistBySlug(params.id);
 
   if (!artist) {
     return {
@@ -64,14 +103,15 @@ export async function generateMetadata({
     )}. ${hashtags}`.trim();
 
   const image = artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER;
-  const url = `${getSiteUrl()}/artists/${artist.id}`;
+  const artistSlug = getArtistSlug(artist);
+  const url = `${getSiteUrl()}/artists/${artistSlug}`;
   const title = `${artist.name} | ${artist.genre} 작가 | ${SITE_NAME}`;
 
   return {
     title,
     description,
     alternates: {
-      canonical: `/artists/${artist.id}`
+      canonical: `/artists/${artistSlug}`
     },
     openGraph: {
       type: "article",
@@ -97,10 +137,18 @@ export async function generateMetadata({
 }
 
 export default async function ArtistDetailPage({ params }: ArtistDetailPageProps) {
-  const artist = await getArtist(params.id);
+  const artist = await getArtistBySlug(params.id);
 
   if (!artist) {
     notFound();
+  }
+
+  const currentSlug = normalizeArtistSlug(params.id);
+  const canonicalSlug = getArtistSlug(artist);
+  const canonicalComparable = normalizeArtistSlug(canonicalSlug);
+
+  if (currentSlug !== canonicalComparable) {
+    redirect(`/artists/${canonicalSlug}`);
   }
 
   const galleryPostUrls = artist.gallery_post_urls.filter((url) => url.trim());

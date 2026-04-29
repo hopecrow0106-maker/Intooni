@@ -4,8 +4,15 @@ import { getSupabasePublicServerClient } from "@/lib/supabase";
 
 const SITE_URL = "https://intooni.com";
 
+export const dynamic = "force-dynamic";
+
 function absoluteUrl(path: string) {
   return new URL(path, SITE_URL).toString();
+}
+
+function getArtistSlug(artist: { id: string; instagram_handle: string }) {
+  const handle = artist.instagram_handle.replace(/^@/, "").trim();
+  return encodeURIComponent(handle || artist.id);
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -34,7 +41,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const supabase = getSupabasePublicServerClient();
     const [{ data: artists }, { data: magazines }] = await Promise.all([
-      supabase.from("artists").select("id, created_at"),
+      supabase.from("artists").select("id, instagram_handle, created_at"),
       supabase
         .from("magazines")
         .select("id, published_at, created_at")
@@ -42,7 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ]);
 
     const artistRoutes: MetadataRoute.Sitemap = (artists ?? []).map((artist) => ({
-      url: absoluteUrl(`/artists/${artist.id}`),
+      url: absoluteUrl(`/artists/${getArtistSlug(artist)}`),
       lastModified: artist.created_at ? new Date(artist.created_at) : now,
       changeFrequency: "weekly",
       priority: 0.6

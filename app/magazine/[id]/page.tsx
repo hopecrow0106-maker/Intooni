@@ -30,6 +30,11 @@ function sortArtistsByIds(artists: Artist[], ids: string[]) {
   return [...artists].sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999));
 }
 
+function getArtistSlug(artist: { id: string; instagram_handle: string }) {
+  const handle = artist.instagram_handle.replace(/^@/, "").trim();
+  return encodeURIComponent(handle || artist.id);
+}
+
 function parseContent(content: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const tokenRegex =
@@ -234,7 +239,7 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
                 {relatedArtists.map((artist) => (
                   <Link
                     key={artist.id}
-                    href={`/artists/${artist.id}`}
+                    href={`/artists/${getArtistSlug(artist)}`}
                     className="overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white text-left transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.08)]"
                   >
                     <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
