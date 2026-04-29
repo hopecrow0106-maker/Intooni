@@ -601,10 +601,10 @@ export default function HomePage() {
       <div className="border-b border-[rgba(0,0,0,0.07)] bg-[rgba(248,247,244,0.96)] px-4 py-2 sm:hidden">
         <Link
           href="/toonbti"
-          className="flex items-center justify-between rounded-[18px] border border-[#ffd6df] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(255,77,109,0.08)]"
+          className="flex items-center justify-between rounded-[18px] bg-[#ff4d6d] px-4 py-3 text-white shadow-[0_12px_28px_rgba(255,77,109,0.28)]"
         >
-          <span className="text-sm font-bold text-[#1a1a1a]">나랑 맞는 작가는?</span>
-          <span className="rounded-full bg-[#fff0f3] px-3 py-1.5 text-xs font-bold text-[#ff4d6d]">
+          <span className="text-sm font-extrabold">나랑 맞는 작가는?</span>
+          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#ff4d6d]">
             테스트하러 고고!
           </span>
         </Link>
