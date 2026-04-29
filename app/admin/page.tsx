@@ -37,6 +37,9 @@ type ArtistChartItem = {
   instagram_click: number;
   embed_click: number;
   hero_click: number;
+  toonbti_result_click: number;
+  toonbti_character_click: number;
+  random_click: number;
 };
 
 type MagazineChartItem = {
@@ -208,7 +211,9 @@ function ArtistStatsChart({
             {getStatsPeriodLabel(period)} 기준 상위 작가 반응
           </h3>
         </div>
-        <p className="text-sm text-slate-500">카드 클릭 + 인스타 이동 + 임베드 이동 + 캐릭터 클릭</p>
+        <p className="text-sm text-slate-500">
+          카드/인스타/임베드/홈 캐릭터/툰비티아이/랜덤 추천 클릭을 구분합니다.
+        </p>
       </div>
 
       {items.length === 0 ? (
@@ -254,6 +259,24 @@ function ArtistStatsChart({
                       style={{ width: `${(item.hero_click / item.total) * 100}%` }}
                     />
                   ) : null}
+                  {item.toonbti_result_click > 0 ? (
+                    <div
+                      className="bg-[#34d399]"
+                      style={{ width: `${(item.toonbti_result_click / item.total) * 100}%` }}
+                    />
+                  ) : null}
+                  {item.toonbti_character_click > 0 ? (
+                    <div
+                      className="bg-[#a78bfa]"
+                      style={{ width: `${(item.toonbti_character_click / item.total) * 100}%` }}
+                    />
+                  ) : null}
+                  {item.random_click > 0 ? (
+                    <div
+                      className="bg-[#38bdf8]"
+                      style={{ width: `${(item.random_click / item.total) * 100}%` }}
+                    />
+                  ) : null}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
@@ -267,7 +290,16 @@ function ArtistStatsChart({
                   임베드 {formatNumber(item.embed_click)}
                 </span>
                 <span className="rounded-full bg-[#fff8e1] px-2.5 py-1 text-[#946200]">
-                  캐릭터 {formatNumber(item.hero_click)}
+                  홈 캐릭터 {formatNumber(item.hero_click)}
+                </span>
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                  툰비티아이 결과 {formatNumber(item.toonbti_result_click)}
+                </span>
+                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-violet-700">
+                  툰비티아이 캐릭터 {formatNumber(item.toonbti_character_click)}
+                </span>
+                <span className="rounded-full bg-sky-50 px-2.5 py-1 text-sky-700">
+                  랜덤 추천 {formatNumber(item.random_click)}
                 </span>
               </div>
             </div>
@@ -872,7 +904,10 @@ export default function AdminPage() {
             profile_click: 0,
             instagram_click: 0,
             embed_click: 0,
-            hero_click: 0
+            hero_click: 0,
+            toonbti_result_click: 0,
+            toonbti_character_click: 0,
+            random_click: 0
           };
         }
 
@@ -880,7 +915,10 @@ export default function AdminPage() {
           stats.profile_click +
           stats.instagram_click +
           stats.embed_click +
-          stats.hero_click;
+          stats.hero_click +
+          stats.toonbti_result_click +
+          stats.toonbti_character_click +
+          stats.random_click;
 
         return {
           id: artist.id,
@@ -889,7 +927,10 @@ export default function AdminPage() {
           profile_click: stats.profile_click,
           instagram_click: stats.instagram_click,
           embed_click: stats.embed_click,
-          hero_click: stats.hero_click
+          hero_click: stats.hero_click,
+          toonbti_result_click: stats.toonbti_result_click,
+          toonbti_character_click: stats.toonbti_character_click,
+          random_click: stats.random_click
         };
       })
       .filter((item) => item.total > 0)

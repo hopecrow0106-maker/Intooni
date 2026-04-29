@@ -8,7 +8,7 @@ import { ArtistModal } from "@/components/ArtistModal";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { ARTIST_SQUARE_PLACEHOLDER } from "@/lib/placeholders";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import type { Artist } from "@/lib/types";
+import type { Artist, ToonbtiQuestionGroup, ToonbtiQuestionOption } from "@/lib/types";
 
 type ToonbtiField = "mood_tags" | "episode_formats" | "style_tags" | "topic_tags";
 
@@ -27,7 +27,7 @@ type ToonbtiQuestion = {
 
 type ToonbtiAnswers = Record<ToonbtiField, string[]>;
 
-const QUESTIONS: ToonbtiQuestion[] = [
+const DEFAULT_QUESTIONS: ToonbtiQuestion[] = [
   {
     key: "mood_tags",
     eyebrow: "Q1",
@@ -100,6 +100,13 @@ const INITIAL_ANSWERS: ToonbtiAnswers = {
 };
 
 const REVEAL_DELAY_MS = 2000;
+const RESULT_PAGE_SIZE = 8;
+const TOONBTI_FIELD_LABELS: Record<ToonbtiField, string> = {
+  mood_tags: "Q1",
+  episode_formats: "Q2",
+  style_tags: "Q3",
+  topic_tags: "Q4"
+};
 const FLOATING_CHARACTER_POSITIONS = [
   "left-[3vw] top-[8vh] h-28 w-28 xl:left-[5vw] xl:h-36 xl:w-36",
   "left-[14vw] top-[29vh] h-32 w-32 xl:left-[13vw] xl:h-44 xl:w-44",
@@ -122,12 +129,57 @@ function getOverlapCount(values: string[], selected: string[]) {
   return selected.filter((value) => normalizedValues.has(value)).length;
 }
 
-function scoreArtist(artist: Artist, answers: ToonbtiAnswers) {
+function buildQuestionsFromConfig(
+  groups: ToonbtiQuestionGroup[],
+  options: ToonbtiQuestionOption[]
+): ToonbtiQuestion[] {
+  const allowedKeys: ToonbtiField[] = ["mood_tags", "episode_formats", "style_tags", "topic_tags"];
+  const activeGroups = groups
+    .filter((group) => group.is_active && allowedKeys.includes(group.key as ToonbtiField))
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  if (activeGroups.length === 0) {
+    return DEFAULT_QUESTIONS;
+  }
+
+  const questions = activeGroups
+    .map((group) => {
+      const groupOptions = options
+        .filter((option) => option.group_id === group.id && option.is_active)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((option) => ({
+          label: option.label,
+          description: option.description || undefined
+        }));
+
+      if (groupOptions.length === 0) {
+        return null;
+      }
+
+      return {
+        key: group.key as ToonbtiField,
+        eyebrow: TOONBTI_FIELD_LABELS[group.key as ToonbtiField],
+        title: group.label,
+        helper:
+          group.selection_mode === "multi"
+            ? `최대 ${group.max_selections}개 선택`
+            : "1개 선택",
+        maxSelections: group.selection_mode === "multi" ? group.max_selections : 1,
+        weight: 3,
+        options: groupOptions
+      } satisfies ToonbtiQuestion;
+    })
+    .filter(Boolean) as ToonbtiQuestion[];
+
+  return questions.length > 0 ? questions : DEFAULT_QUESTIONS;
+}
+
+function scoreArtist(artist: Artist, answers: ToonbtiAnswers, questions: ToonbtiQuestion[]) {
   if (answers.style_tags.includes("흑백") && !artist.style_tags.includes("흑백")) {
     return 0;
   }
 
-  return QUESTIONS.reduce((score, question) => {
+  return questions.reduce((score, question) => {
     const selected = answers[question.key];
 
     if (selected.length === 0 || selected.includes("상관없어")) {
@@ -335,7 +387,9 @@ function ResultInstagramCard({
 export default function ToonbtiPage() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const revealTimerRef = useRef<number | null>(null);
+  const resultsRef = useRef<HTMLElement | null>(null);
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [questions, setQuestions] = useState<ToonbtiQuestion[]>(DEFAULT_QUESTIONS);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<ToonbtiAnswers>(INITIAL_ANSWERS);
   const [currentStep, setCurrentStep] = useState(0);
@@ -343,11 +397,12 @@ export default function ToonbtiPage() {
   const [isRevealing, setIsRevealing] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [revealArtist, setRevealArtist] = useState<Artist | null>(null);
+  const [resultPage, setResultPage] = useState(1);
 
-  const currentQuestion = QUESTIONS[currentStep];
+  const currentQuestion = questions[currentStep] ?? DEFAULT_QUESTIONS[0];
   const currentSelected = answers[currentQuestion.key];
   const selectedCount = Object.values(answers).reduce((sum, values) => sum + values.length, 0);
-  const isLastStep = currentStep === QUESTIONS.length - 1;
+  const isLastStep = currentStep === questions.length - 1;
   const floatingArtists = useMemo(() => pickFloatingArtists(artists, currentStep), [artists, currentStep]);
   useEffect(() => {
     let mounted = true;
@@ -358,13 +413,25 @@ export default function ToonbtiPage() {
         return;
       }
 
-      const { data, error } = await supabase.from("artists").select("*");
+      const [{ data, error }, toonbtiResponse] = await Promise.all([
+        supabase.from("artists").select("*"),
+        fetch("/api/toonbti", { cache: "no-store" })
+      ]);
 
       if (!mounted) {
         return;
       }
 
       setArtists(error ? [] : data ?? []);
+
+      if (toonbtiResponse.ok) {
+        const toonbtiData = (await toonbtiResponse.json()) as {
+          groups?: ToonbtiQuestionGroup[];
+          options?: ToonbtiQuestionOption[];
+        };
+        setQuestions(buildQuestionsFromConfig(toonbtiData.groups ?? [], toonbtiData.options ?? []));
+      }
+
       setLoading(false);
     };
 
@@ -383,16 +450,46 @@ export default function ToonbtiPage() {
     };
   }, []);
 
-  const recommendedArtists = useMemo(() => {
+  const trackArtistEvent = (
+    artistId: string,
+    eventType: "toonbti_result_click" | "toonbti_character_click"
+  ) => {
+    void fetch("/api/artist-events", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ artistId, eventType }),
+      keepalive: true
+    }).catch(() => undefined);
+  };
+
+  const openArtistModal = (
+    artist: Artist,
+    eventType: "toonbti_result_click" | "toonbti_character_click"
+  ) => {
+    trackArtistEvent(artist.id, eventType);
+    setSelectedArtist(artist);
+  };
+
+  const allRecommendedArtists = useMemo(() => {
     return artists
       .map((artist) => ({
         artist,
-        score: scoreArtist(artist, answers)
+        score: scoreArtist(artist, answers, questions)
       }))
       .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score || b.artist.followers - a.artist.followers)
-      .slice(0, 8);
-  }, [answers, artists]);
+      .sort((a, b) => b.score - a.score || b.artist.followers - a.artist.followers);
+  }, [answers, artists, questions]);
+  const recommendedArtists = useMemo(
+    () =>
+      allRecommendedArtists.slice(
+        (resultPage - 1) * RESULT_PAGE_SIZE,
+        resultPage * RESULT_PAGE_SIZE
+      ),
+    [allRecommendedArtists, resultPage]
+  );
+  const canLoadMoreResults = resultPage * RESULT_PAGE_SIZE < allRecommendedArtists.length;
   const thumbnailRecommendations = recommendedArtists.filter((item) => item.artist.thumbnail_url);
   const instagramRecommendations = recommendedArtists.filter(
     (item) => !item.artist.thumbnail_url && getFallbackInstagramUrl(item.artist)
@@ -401,6 +498,7 @@ export default function ToonbtiPage() {
   const toggleAnswer = (question: ToonbtiQuestion, value: string) => {
     setShowResults(false);
     setIsRevealing(false);
+    setResultPage(1);
     setAnswers((current) => {
       const selected = current[question.key];
       const isSelected = selected.includes(value);
@@ -460,7 +558,7 @@ export default function ToonbtiPage() {
       return;
     }
 
-    setCurrentStep((step) => Math.min(step + 1, QUESTIONS.length - 1));
+    setCurrentStep((step) => Math.min(step + 1, questions.length - 1));
   };
 
   const goBack = () => {
@@ -475,6 +573,21 @@ export default function ToonbtiPage() {
     setShowResults(false);
     setIsRevealing(false);
     setSelectedArtist(null);
+    setResultPage(1);
+  };
+
+  const loadMoreResults = () => {
+    if (!canLoadMoreResults) {
+      return;
+    }
+
+    setResultPage((page) => page + 1);
+    window.setTimeout(() => {
+      resultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 80);
   };
 
   return (
@@ -503,7 +616,10 @@ export default function ToonbtiPage() {
             }
           }
         `}</style>
-        <FloatingToonbtiCharacters artists={floatingArtists} onPick={setSelectedArtist} />
+        <FloatingToonbtiCharacters
+          artists={floatingArtists}
+          onPick={(artist) => openArtistModal(artist, "toonbti_character_click")}
+        />
 
         <div className="relative z-10 mb-8 text-center">
           <p className="mb-3 text-sm font-bold text-[#ff4d6d]">ToonBTI Test</p>
@@ -530,7 +646,7 @@ export default function ToonbtiPage() {
                 {revealArtist ? (
                   <button
                     type="button"
-                    onClick={() => setSelectedArtist(revealArtist)}
+                    onClick={() => openArtistModal(revealArtist, "toonbti_character_click")}
                     className="relative mx-auto mb-6 block h-28 w-28 rounded-[28px] transition hover:scale-105"
                     style={{
                       animation: "toonbti-character-float 4.8s ease-in-out infinite"
@@ -562,7 +678,7 @@ export default function ToonbtiPage() {
           <div className="relative z-10 mx-auto max-w-3xl">
             <div className="mb-5 rounded-full border border-[rgba(0,0,0,0.08)] bg-white p-1.5">
               <div className="grid grid-cols-4 gap-1.5">
-                {QUESTIONS.map((question, index) => (
+                {questions.map((question, index) => (
                   <div
                     key={question.key}
                     className={`h-2 rounded-full transition ${
@@ -641,7 +757,7 @@ export default function ToonbtiPage() {
           </div>
           )
         ) : (
-          <section className="relative z-10 mx-auto max-w-5xl">
+          <section ref={resultsRef} className="relative z-10 mx-auto max-w-5xl scroll-mt-20">
             <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-sm font-bold text-[#ff4d6d]">Result</p>
@@ -667,7 +783,7 @@ export default function ToonbtiPage() {
                       <ResultArtistCard
                         key={item.artist.id}
                         artist={item.artist}
-                        onClick={() => setSelectedArtist(item.artist)}
+                        onClick={() => openArtistModal(item.artist, "toonbti_result_click")}
                       />
                     ))}
                   </div>
@@ -686,7 +802,7 @@ export default function ToonbtiPage() {
                       <ResultInstagramCard
                         key={item.artist.id}
                         artist={item.artist}
-                        onClick={() => setSelectedArtist(item.artist)}
+                        onClick={() => openArtistModal(item.artist, "toonbti_result_click")}
                       />
                     ))}
                     </div>
@@ -698,6 +814,14 @@ export default function ToonbtiPage() {
             <div className="mt-8 flex justify-center">
               <button
                 type="button"
+                onClick={loadMoreResults}
+                disabled={!canLoadMoreResults}
+                className="mr-3 rounded-full bg-[#ff4d6d] px-6 py-3 text-sm font-bold text-white shadow-[0_16px_34px_rgba(255,77,109,0.18)] transition hover:bg-[#e83a5a] disabled:cursor-not-allowed disabled:bg-[#d8d6d2] disabled:shadow-none"
+              >
+                더 찾아보기!
+              </button>
+              <button
+                type="button"
                 onClick={resetTest}
                 className="rounded-full border border-[rgba(0,0,0,0.08)] bg-white px-6 py-3 text-sm font-bold text-[#6b6b6b] transition hover:border-[#ff4d6d] hover:text-[#ff4d6d]"
               >
@@ -707,7 +831,10 @@ export default function ToonbtiPage() {
           </section>
         )}
 
-        <MobileFloatingToonbtiCharacters artists={floatingArtists} onPick={setSelectedArtist} />
+        <MobileFloatingToonbtiCharacters
+          artists={floatingArtists}
+          onPick={(artist) => openArtistModal(artist, "toonbti_character_click")}
+        />
       </section>
 
       <ArtistModal artist={selectedArtist} onClose={() => setSelectedArtist(null)} />

@@ -2,7 +2,10 @@ export const ARTIST_EVENT_TYPES = [
   "profile_click",
   "instagram_click",
   "embed_click",
-  "hero_click"
+  "hero_click",
+  "toonbti_result_click",
+  "toonbti_character_click",
+  "random_click"
 ] as const;
 
 export type ArtistEventType = (typeof ARTIST_EVENT_TYPES)[number];
@@ -23,13 +26,19 @@ export type ArtistStatsSummary = {
   instagram_click: number;
   embed_click: number;
   hero_click: number;
+  toonbti_result_click: number;
+  toonbti_character_click: number;
+  random_click: number;
 };
 
 export const EMPTY_ARTIST_STATS: Omit<ArtistStatsSummary, "artist_id"> = {
   profile_click: 0,
   instagram_click: 0,
   embed_click: 0,
-  hero_click: 0
+  hero_click: 0,
+  toonbti_result_click: 0,
+  toonbti_character_click: 0,
+  random_click: 0
 };
 
 export function getArtistStatsThreshold(period: ArtistStatsPeriod) {
@@ -47,4 +56,3 @@ export function getArtistStatsThreshold(period: ArtistStatsPeriod) {
       return null;
   }
 }
-

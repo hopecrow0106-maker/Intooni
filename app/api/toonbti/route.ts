@@ -66,10 +66,6 @@ async function getNextSortOrder(entity: ToonbtiEntity, groupId?: string) {
 }
 
 export async function GET() {
-  if (!isAdminAuthenticated()) {
-    return unauthorizedResponse();
-  }
-
   try {
     const supabase = getSupabaseAdminClient();
     const [{ data: groups, error: groupsError }, { data: options, error: optionsError }] =

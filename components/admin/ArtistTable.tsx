@@ -232,7 +232,16 @@ export function ArtistTable({
                               임베드 이동 {stats.embed_click}
                             </span>
                             <span className="rounded-full bg-[#fff8e1] px-2.5 py-1 text-[#946200]">
-                              캐릭터 클릭 {stats.hero_click}
+                              홈 캐릭터 {stats.hero_click}
+                            </span>
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                              툰비티아이 결과 {stats.toonbti_result_click}
+                            </span>
+                            <span className="rounded-full bg-violet-50 px-2.5 py-1 text-violet-700">
+                              툰비티아이 캐릭터 {stats.toonbti_character_click}
+                            </span>
+                            <span className="rounded-full bg-sky-50 px-2.5 py-1 text-sky-700">
+                              랜덤 추천 {stats.random_click}
                             </span>
                           </div>
                         </div>
