@@ -8,7 +8,7 @@ import { ArtistModal } from "@/components/ArtistModal";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { ARTIST_SQUARE_PLACEHOLDER } from "@/lib/placeholders";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import type { Artist, ToonbtiQuestionGroup, ToonbtiQuestionOption } from "@/lib/types";
+import type { Artist } from "@/lib/types";
 
 type ToonbtiField = "mood_tags" | "episode_formats" | "style_tags" | "topic_tags";
 
@@ -18,7 +18,6 @@ type ToonbtiQuestion = {
   title: string;
   helper: string;
   maxSelections: number;
-  weight: number;
   options: Array<{
     label: string;
     description?: string;
@@ -34,7 +33,6 @@ const DEFAULT_QUESTIONS: ToonbtiQuestion[] = [
     title: "나는 이런 분위기의 인스타툰이 좋아!",
     helper: "최대 2개 선택",
     maxSelections: 2,
-    weight: 3,
     options: [{ label: "개그" }, { label: "잔잔" }, { label: "달달" }, { label: "고자극" }, { label: "귀여움" }]
   },
   {
@@ -43,7 +41,6 @@ const DEFAULT_QUESTIONS: ToonbtiQuestion[] = [
     title: "에피소드는 이 정도 호흡이 좋지..",
     helper: "1개 선택",
     maxSelections: 1,
-    weight: 3,
     options: [
       { label: "짧다", description: "한 화마다 바로 끝남" },
       { label: "중간", description: "2~3화 안에 마무리" },
@@ -56,7 +53,6 @@ const DEFAULT_QUESTIONS: ToonbtiQuestion[] = [
     title: "그림체는 이런 게 좋더라",
     helper: "최대 2개 선택",
     maxSelections: 2,
-    weight: 3,
     options: [
       { label: "단순" },
       { label: "귀여움" },
@@ -74,7 +70,6 @@ const DEFAULT_QUESTIONS: ToonbtiQuestion[] = [
     title: "어떤 주제가 제일 좋을까..",
     helper: "최대 4개 선택",
     maxSelections: 4,
-    weight: 3,
     options: [
       { label: "상관없어" },
       { label: "연애" },
@@ -101,12 +96,6 @@ const INITIAL_ANSWERS: ToonbtiAnswers = {
 
 const REVEAL_DELAY_MS = 2000;
 const RESULT_PAGE_SIZE = 8;
-const TOONBTI_FIELD_LABELS: Record<ToonbtiField, string> = {
-  mood_tags: "Q1",
-  episode_formats: "Q2",
-  style_tags: "Q3",
-  topic_tags: "Q4"
-};
 const FLOATING_CHARACTER_POSITIONS = [
   "left-[3vw] top-[8vh] h-28 w-28 xl:left-[5vw] xl:h-36 xl:w-36",
   "left-[14vw] top-[29vh] h-32 w-32 xl:left-[13vw] xl:h-44 xl:w-44",
@@ -129,65 +118,57 @@ function getOverlapCount(values: string[], selected: string[]) {
   return selected.filter((value) => normalizedValues.has(value)).length;
 }
 
-function buildQuestionsFromConfig(
-  groups: ToonbtiQuestionGroup[],
-  options: ToonbtiQuestionOption[]
-): ToonbtiQuestion[] {
-  const allowedKeys: ToonbtiField[] = ["mood_tags", "episode_formats", "style_tags", "topic_tags"];
-  const activeGroups = groups
-    .filter((group) => group.is_active && allowedKeys.includes(group.key as ToonbtiField))
-    .sort((a, b) => a.sort_order - b.sort_order);
+function collectArtistTags(artists: Artist[], field: ToonbtiField) {
+  const tags = new Set<string>();
 
-  if (activeGroups.length === 0) {
-    return DEFAULT_QUESTIONS;
-  }
+  artists.forEach((artist) => {
+    artist[field].forEach((tag) => {
+      const trimmed = tag.trim();
 
-  const questions = activeGroups
-    .map((group) => {
-      const groupOptions = options
-        .filter((option) => option.group_id === group.id && option.is_active)
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((option) => ({
-          label: option.label,
-          description: option.description || undefined
-        }));
-
-      if (groupOptions.length === 0) {
-        return null;
+      if (trimmed) {
+        tags.add(trimmed);
       }
+    });
+  });
 
-      return {
-        key: group.key as ToonbtiField,
-        eyebrow: TOONBTI_FIELD_LABELS[group.key as ToonbtiField],
-        title: group.label,
-        helper:
-          group.selection_mode === "multi"
-            ? `최대 ${group.max_selections}개 선택`
-            : "1개 선택",
-        maxSelections: group.selection_mode === "multi" ? group.max_selections : 1,
-        weight: 3,
-        options: groupOptions
-      } satisfies ToonbtiQuestion;
-    })
-    .filter(Boolean) as ToonbtiQuestion[];
-
-  return questions.length > 0 ? questions : DEFAULT_QUESTIONS;
+  return [...tags];
 }
 
-function scoreArtist(artist: Artist, answers: ToonbtiAnswers, questions: ToonbtiQuestion[]) {
-  if (answers.style_tags.includes("흑백") && !artist.style_tags.includes("흑백")) {
-    return 0;
+function mergeQuestionOptions(question: ToonbtiQuestion, artists: Artist[]): ToonbtiQuestion {
+  if (question.key === "episode_formats") {
+    return question;
   }
 
-  return questions.reduce((score, question) => {
-    const selected = answers[question.key];
+  const artistLabels = collectArtistTags(artists, question.key);
+  const mergedLabels = artistLabels.filter(
+    (label, index, labels) => labels.indexOf(label) === index
+  );
 
-    if (selected.length === 0 || selected.includes("상관없어")) {
-      return score;
+  return {
+    ...question,
+    options: mergedLabels.map((label) => ({ label }))
+  };
+}
+
+function buildQuestionsFromArtists(artists: Artist[]) {
+  return DEFAULT_QUESTIONS.map((question) => mergeQuestionOptions(question, artists));
+}
+
+function artistMatchesSelectedFilters(
+  artist: Artist,
+  answers: ToonbtiAnswers,
+  questions: ToonbtiQuestion[]
+) {
+  return questions.every((question) => {
+    const selected = answers[question.key];
+    const effectiveSelected = selected.filter((value) => value !== "상관없어");
+
+    if (effectiveSelected.length === 0) {
+      return true;
     }
 
-    return score + getOverlapCount(artist[question.key], selected) * question.weight;
-  }, 0);
+    return getOverlapCount(artist[question.key], effectiveSelected) > 0;
+  });
 }
 
 function formatChoiceSummary(answers: ToonbtiAnswers) {
@@ -389,7 +370,6 @@ export default function ToonbtiPage() {
   const revealTimerRef = useRef<number | null>(null);
   const resultsRef = useRef<HTMLElement | null>(null);
   const [artists, setArtists] = useState<Artist[]>([]);
-  const [questions, setQuestions] = useState<ToonbtiQuestion[]>(DEFAULT_QUESTIONS);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<ToonbtiAnswers>(INITIAL_ANSWERS);
   const [currentStep, setCurrentStep] = useState(0);
@@ -398,6 +378,7 @@ export default function ToonbtiPage() {
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [revealArtist, setRevealArtist] = useState<Artist | null>(null);
   const [resultPage, setResultPage] = useState(1);
+  const questions = useMemo(() => buildQuestionsFromArtists(artists), [artists]);
 
   const currentQuestion = questions[currentStep] ?? DEFAULT_QUESTIONS[0];
   const currentSelected = answers[currentQuestion.key];
@@ -413,24 +394,13 @@ export default function ToonbtiPage() {
         return;
       }
 
-      const [{ data, error }, toonbtiResponse] = await Promise.all([
-        supabase.from("artists").select("*"),
-        fetch("/api/toonbti", { cache: "no-store" })
-      ]);
+      const { data, error } = await supabase.from("artists").select("*");
 
       if (!mounted) {
         return;
       }
 
       setArtists(error ? [] : data ?? []);
-
-      if (toonbtiResponse.ok) {
-        const toonbtiData = (await toonbtiResponse.json()) as {
-          groups?: ToonbtiQuestionGroup[];
-          options?: ToonbtiQuestionOption[];
-        };
-        setQuestions(buildQuestionsFromConfig(toonbtiData.groups ?? [], toonbtiData.options ?? []));
-      }
 
       setLoading(false);
     };
@@ -474,12 +444,9 @@ export default function ToonbtiPage() {
 
   const allRecommendedArtists = useMemo(() => {
     return artists
-      .map((artist) => ({
-        artist,
-        score: scoreArtist(artist, answers, questions)
-      }))
-      .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score || b.artist.followers - a.artist.followers);
+      .filter((artist) => artistMatchesSelectedFilters(artist, answers, questions))
+      .sort((a, b) => b.followers - a.followers)
+      .map((artist) => ({ artist }));
   }, [answers, artists, questions]);
   const recommendedArtists = useMemo(
     () =>
@@ -701,10 +668,13 @@ export default function ToonbtiPage() {
                       {currentQuestion.title}
                     </h2>
                   </div>
-                  <p className="text-sm font-semibold text-[#a0a0a0]">{currentQuestion.helper}</p>
+                  <p className="text-sm font-semibold text-[#a0a0a0]">
+                    {currentQuestion.helper} · 전체 {currentQuestion.options.length}개
+                  </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2.5">
+                <div className="max-h-[42vh] overflow-y-auto pr-1">
+                  <div className="flex flex-wrap gap-2.5">
                   {currentQuestion.options.map((option) => {
                     const selected = currentSelected.includes(option.label);
 
@@ -728,6 +698,7 @@ export default function ToonbtiPage() {
                       </button>
                     );
                   })}
+                  </div>
                 </div>
 
                 <div className="mt-9 flex items-center justify-between gap-3">

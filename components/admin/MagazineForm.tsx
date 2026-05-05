@@ -78,6 +78,10 @@ function buildDividerToken() {
   return "\n\n{{divider}}\n\n";
 }
 
+function buildInstagramToken(url: string) {
+  return `\n\n{{instagram:${url}}}\n\n`;
+}
+
 export function MagazineForm({
   isOpen,
   initialMagazine,
@@ -92,6 +96,7 @@ export function MagazineForm({
     inlineImage: false
   });
   const [artistSearch, setArtistSearch] = useState("");
+  const [inlineInstagramUrl, setInlineInstagramUrl] = useState("");
   const [formMessage, setFormMessage] = useState("");
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -99,6 +104,7 @@ export function MagazineForm({
     setForm(createInitialState(initialMagazine));
     setUploading({ thumbnail: false, inlineImage: false });
     setArtistSearch("");
+    setInlineInstagramUrl("");
     setFormMessage("");
   }, [initialMagazine, isOpen]);
 
@@ -205,6 +211,24 @@ export function MagazineForm({
     } finally {
       setUploading((current) => ({ ...current, inlineImage: false }));
     }
+  };
+
+  const appendInlineInstagram = () => {
+    const url = inlineInstagramUrl.trim();
+
+    if (!url) {
+      setFormMessage("본문에 넣을 인스타 링크를 입력해 주세요.");
+      return;
+    }
+
+    if (!/^https?:\/\/(www\.)?instagram\.com\//i.test(url)) {
+      setFormMessage("인스타그램 링크만 넣을 수 있어요.");
+      return;
+    }
+
+    insertContentToken(buildInstagramToken(url));
+    setInlineInstagramUrl("");
+    setFormMessage("");
   };
 
   return (
@@ -426,6 +450,28 @@ export function MagazineForm({
             </div>
 
             <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="text-sm font-semibold text-slate-700">인스타 임베드 삽입</p>
+              <p className="mt-1 text-xs text-slate-400">
+                본문 중간에 보여줄 인스타 게시물 URL을 넣고 버튼을 누르면 커서 위치에 삽입됩니다.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 md:flex-row">
+                <input
+                  value={inlineInstagramUrl}
+                  onChange={(event) => setInlineInstagramUrl(event.target.value)}
+                  placeholder="https://www.instagram.com/p/..."
+                  className="min-w-0 flex-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm outline-none transition focus:border-ink"
+                />
+                <button
+                  type="button"
+                  onClick={appendInlineInstagram}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                >
+                  본문에 인스타 넣기
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 border-t border-slate-100 pt-4">
               <p className="text-sm font-semibold text-slate-700">텍스트 블록 삽입</p>
               <p className="mt-1 text-xs text-slate-400">
                 제목, 작은 글씨, 굵은 글씨, 좌/중/우 정렬 문장을 본문 사이에 바로 넣을 수 있습니다.
@@ -509,6 +555,7 @@ export function MagazineForm({
               <p>
                 {"{{text:문장|title|left|bold}}"} 또는 {"{{text:문장|body|center|normal}}"} 형식으로 텍스트가 저장됩니다.
               </p>
+              <p>{"{{instagram:URL}}"} 형식으로 본문 중간 인스타 임베드가 저장됩니다.</p>
             </div>
           </div>
 

@@ -23,6 +23,7 @@ type ContentBlock =
       bold: boolean;
     }
   | { type: "image"; url: string; size: "wide" | "medium" }
+  | { type: "instagram"; url: string }
   | { type: "divider" };
 
 function sortArtistsByIds(artists: Artist[], ids: string[]) {
@@ -38,7 +39,7 @@ function getArtistSlug(artist: { id: string; instagram_handle: string }) {
 function parseContent(content: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const tokenRegex =
-    /\{\{divider\}\}|\{\{(image|text):(.+?)\|(wide|medium|small|body|large|title)(?:\|(left|center|right))?(?:\|(bold|normal))?\}\}/g;
+    /\{\{divider\}\}|\{\{instagram:(.+?)\}\}|\{\{(image|text):(.+?)\|(wide|medium|small|body|large|title)(?:\|(left|center|right))?(?:\|(bold|normal))?\}\}/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -51,19 +52,24 @@ function parseContent(content: string): ContentBlock[] {
 
     if (match[0] === "{{divider}}") {
       blocks.push({ type: "divider" });
-    } else if (match[1] === "image") {
+    } else if (match[1]) {
+      blocks.push({
+        type: "instagram",
+        url: match[1]
+      });
+    } else if (match[2] === "image") {
       blocks.push({
         type: "image",
-        url: match[2],
-        size: match[3] as "wide" | "medium"
+        url: match[3],
+        size: match[4] as "wide" | "medium"
       });
     } else {
       blocks.push({
         type: "text",
-        value: match[2],
-        size: match[3] as "small" | "body" | "large" | "title",
-        align: (match[4] as "left" | "center" | "right" | undefined) ?? "left",
-        bold: match[5] === "bold"
+        value: match[3],
+        size: match[4] as "small" | "body" | "large" | "title",
+        align: (match[5] as "left" | "center" | "right" | undefined) ?? "left",
+        bold: match[6] === "bold"
       });
     }
 
@@ -202,6 +208,17 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
                   return (
                     <div key={`divider-${index}`} className="py-4">
                       <div className="h-px w-full bg-slate-200" />
+                    </div>
+                  );
+                }
+
+                if (block.type === "instagram") {
+                  return (
+                    <div key={`instagram-${index}`} className="mx-auto max-w-xl">
+                      <InstagramEmbed
+                        url={block.url}
+                        className="min-h-[420px] rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.05)]"
+                      />
                     </div>
                   );
                 }
