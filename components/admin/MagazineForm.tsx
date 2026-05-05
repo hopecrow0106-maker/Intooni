@@ -346,7 +346,7 @@ export function MagazineForm({
                     src={form.thumbnail_url}
                     alt="매거진 커버"
                     fill
-                    className="object-cover"
+                    className="object-contain"
                     sizes="240px"
                   />
                 ) : (

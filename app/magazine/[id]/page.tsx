@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -156,14 +157,11 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
       <div className="min-w-0">
         <article className="mx-auto max-w-5xl space-y-8">
           <div className="overflow-hidden rounded-[28px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_16px_40px_rgba(0,0,0,0.06)]">
-            <div className="relative aspect-[2/1] bg-[#f2f0ec]">
-              <Image
+            <div className="bg-[#f2f0ec]">
+              <img
                 src={magazine.thumbnail_url || MAGAZINE_RECT_PLACEHOLDER}
                 alt={magazine.title}
-                fill
-                className="object-cover"
-                priority
-                sizes="(max-width: 1024px) 100vw, 1024px"
+                className="h-auto w-full object-contain"
               />
             </div>
           </div>
@@ -228,18 +226,12 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
                     key={`image-${index}`}
                     className={block.size === "wide" ? "space-y-2" : "mx-auto max-w-2xl space-y-2"}
                   >
-                    <div className="relative overflow-hidden rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-[#f2f0ec] shadow-[0_12px_28px_rgba(0,0,0,0.05)]">
-                      <div className={block.size === "wide" ? "relative aspect-[16/9]" : "relative aspect-[4/5]"}>
-                        <Image
+                    <div className="overflow-hidden rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-[#f2f0ec] shadow-[0_12px_28px_rgba(0,0,0,0.05)]">
+                      <div>
+                        <img
                           src={block.url}
                           alt={`${magazine.title} 본문 이미지 ${index + 1}`}
-                          fill
-                          className="object-cover"
-                          sizes={
-                            block.size === "wide"
-                              ? "(max-width: 1024px) 100vw, 1024px"
-                              : "(max-width: 768px) 100vw, 640px"
-                          }
+                          className="h-auto w-full object-contain"
                         />
                       </div>
                     </div>
