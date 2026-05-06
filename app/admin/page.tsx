@@ -374,6 +374,8 @@ export default function AdminPage() {
   const [showAllArtistStats, setShowAllArtistStats] = useState(false);
   const [showAllSearchQueries, setShowAllSearchQueries] = useState(false);
   const [artistPage, setArtistPage] = useState(1);
+  const [showHiddenTagMissingOnly, setShowHiddenTagMissingOnly] = useState(false);
+  const [showToonbtiMissingOnly, setShowToonbtiMissingOnly] = useState(false);
 
   const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -850,12 +852,29 @@ export default function AdminPage() {
 
   const filteredSortedArtists = useMemo(() => {
     const query = artistSearch.trim().toLowerCase();
+    let baseArtists = sortedArtists;
 
-    if (!query) {
-      return sortedArtists;
+    if (showHiddenTagMissingOnly) {
+      baseArtists = baseArtists.filter(
+        (artist) => artist.hidden_tags.map((tag) => tag.trim()).filter(Boolean).length === 0
+      );
     }
 
-    return sortedArtists.filter((artist) => {
+    if (showToonbtiMissingOnly) {
+      baseArtists = baseArtists.filter(
+        (artist) =>
+          artist.mood_tags.length === 0 ||
+          artist.episode_formats.length === 0 ||
+          artist.style_tags.length === 0 ||
+          artist.topic_tags.length === 0
+      );
+    }
+
+    if (!query) {
+      return baseArtists;
+    }
+
+    return baseArtists.filter((artist) => {
       const searchable = [
         artist.name,
         artist.instagram_handle,
@@ -870,11 +889,31 @@ export default function AdminPage() {
 
       return searchable.includes(query);
     });
-  }, [artistSearch, sortedArtists]);
+  }, [artistSearch, showHiddenTagMissingOnly, showToonbtiMissingOnly, sortedArtists]);
+
+  const hiddenTagMissingCount = useMemo(
+    () =>
+      sortedArtists.filter(
+        (artist) => artist.hidden_tags.map((tag) => tag.trim()).filter(Boolean).length === 0
+      ).length,
+    [sortedArtists]
+  );
+
+  const toonbtiMissingCount = useMemo(
+    () =>
+      sortedArtists.filter(
+        (artist) =>
+          artist.mood_tags.length === 0 ||
+          artist.episode_formats.length === 0 ||
+          artist.style_tags.length === 0 ||
+          artist.topic_tags.length === 0
+      ).length,
+    [sortedArtists]
+  );
 
   useEffect(() => {
     setArtistPage(1);
-  }, [artistSearch, activeTab]);
+  }, [artistSearch, activeTab, showHiddenTagMissingOnly, showToonbtiMissingOnly]);
 
   const totalArtistPages = Math.max(1, Math.ceil(filteredSortedArtists.length / ADMIN_ARTISTS_PER_PAGE));
   const safeArtistPage = Math.min(artistPage, totalArtistPages);
@@ -1050,6 +1089,20 @@ export default function AdminPage() {
                 {label} 통계
               </button>
             ))}
+              <button
+                type="button"
+                onClick={() => setShowHiddenTagMissingOnly((current) => !current)}
+                className={`pill-button ${showHiddenTagMissingOnly ? "pill-button-active" : ""}`}
+              >
+                숨김태그 누락만 {formatNumber(hiddenTagMissingCount)}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowToonbtiMissingOnly((current) => !current)}
+                className={`pill-button ${showToonbtiMissingOnly ? "pill-button-active" : ""}`}
+              >
+                툰비티아이 누락만 {formatNumber(toonbtiMissingCount)}
+              </button>
             </div>
 
             <div className="max-w-md">

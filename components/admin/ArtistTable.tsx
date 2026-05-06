@@ -73,6 +73,10 @@ function isToonbtiDataMissing(artist: Artist) {
   );
 }
 
+function isHiddenTagsMissing(artist: Artist) {
+  return artist.hidden_tags.map((tag) => tag.trim()).filter(Boolean).length === 0;
+}
+
 function getPeriodLabel(period: ArtistStatsPeriod) {
   switch (period) {
     case "day":
@@ -217,6 +221,11 @@ export function ArtistTable({
                             {isToonbtiDataMissing(artist) ? (
                               <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-600">
                                 툰비티아이 데이터 누락!
+                              </span>
+                            ) : null}
+                            {isHiddenTagsMissing(artist) ? (
+                              <span className="rounded-full bg-orange-100 px-2.5 py-1 font-semibold text-orange-700">
+                                숨김태그 누락!
                               </span>
                             ) : null}
                           </div>

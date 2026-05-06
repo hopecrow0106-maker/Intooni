@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import { InstagramQuickImport } from "@/components/admin/InstagramQuickImport";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import type { Artist, Category } from "@/lib/types";
 
@@ -456,6 +457,26 @@ export function ArtistForm({
               {formMessage}
             </div>
           ) : null}
+
+          <InstagramQuickImport
+            onApply={(values) => {
+              setForm((current) => ({
+                ...current,
+                ...values,
+                name: values.name || current.name,
+                instagram_handle: values.instagram_handle || current.instagram_handle,
+                bio: values.bio || current.bio,
+                memo: values.memo || current.memo,
+                thumbnail_url: values.thumbnail_url || current.thumbnail_url,
+                followers: values.followers ?? current.followers,
+                post_count: values.post_count ?? current.post_count,
+                gallery_post_urls: values.gallery_post_urls
+                  ? [...values.gallery_post_urls, "", "", "", ""].slice(0, 4)
+                  : current.gallery_post_urls
+              }));
+              setFormMessage("");
+            }}
+          />
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
