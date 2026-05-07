@@ -4,7 +4,7 @@ import { Noto_Sans_KR, Plus_Jakarta_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
 import "@/app/globals.css";
-import { ADSENSE_ENABLED } from "@/components/GoogleAd";
+import { ADSENSE_ENABLED } from "@/lib/adsense";
 import { getSiteUrl, SITE_NAME } from "@/lib/site";
 
 const jakartaSans = Plus_Jakarta_Sans({

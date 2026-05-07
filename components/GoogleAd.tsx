@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from "react";
 
+import { ADSENSE_ENABLED } from "@/lib/adsense";
+
 const ADSENSE_CLIENT = "ca-pub-8362832465607393";
-export const ADSENSE_ENABLED = false;
 
 declare global {
   interface Window {
