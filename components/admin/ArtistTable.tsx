@@ -77,6 +77,10 @@ function isHiddenTagsMissing(artist: Artist) {
   return artist.hidden_tags.map((tag) => tag.trim()).filter(Boolean).length === 0;
 }
 
+function isCharacterImageMissing(artist: Artist) {
+  return artist.character_url.trim().length === 0;
+}
+
 function getPeriodLabel(period: ArtistStatsPeriod) {
   switch (period) {
     case "day":
@@ -226,6 +230,11 @@ export function ArtistTable({
                             {isHiddenTagsMissing(artist) ? (
                               <span className="rounded-full bg-orange-100 px-2.5 py-1 font-semibold text-orange-700">
                                 숨김태그 누락!
+                              </span>
+                            ) : null}
+                            {isCharacterImageMissing(artist) ? (
+                              <span className="rounded-full bg-sky-100 px-2.5 py-1 font-semibold text-sky-700">
+                                누끼 PNG 누락!
                               </span>
                             ) : null}
                           </div>
