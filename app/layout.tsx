@@ -21,15 +21,22 @@ const notoKr = Noto_Sans_KR({
 
 const siteUrl = getSiteUrl();
 const ogImageUrl = `${siteUrl}/og-home.png`;
-const defaultTitle = `${SITE_NAME} | 모든 인스타툰, 한 곳에서 발견하세요`;
+const defaultTitle = `${SITE_NAME} | 기억 안 나는 인스타툰 찾기`;
 const defaultDescription =
-  "그 계정 뭐였지..? 아이디가 안 떠올라도 떠오르는 키워드로 찾아봐요!";
+  "작가 이름이 생각 안 날 때, 해시태그와 키워드로 인스타툰 작가를 찾아보세요. 썰툰, 일상툰, 연애툰부터 랜덤 추천까지 한 곳에서 발견해요.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: defaultTitle,
   description: defaultDescription,
   applicationName: SITE_NAME,
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" }
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+  },
   keywords: [
     "인투니",
     "인스타툰",
