@@ -376,6 +376,7 @@ export default function AdminPage() {
   const [artistPage, setArtistPage] = useState(1);
   const [showHiddenTagMissingOnly, setShowHiddenTagMissingOnly] = useState(false);
   const [showToonbtiMissingOnly, setShowToonbtiMissingOnly] = useState(false);
+  const [showCharacterMissingOnly, setShowCharacterMissingOnly] = useState(false);
 
   const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -870,6 +871,10 @@ export default function AdminPage() {
       );
     }
 
+    if (showCharacterMissingOnly) {
+      baseArtists = baseArtists.filter((artist) => artist.character_url.trim().length === 0);
+    }
+
     if (!query) {
       return baseArtists;
     }
@@ -889,7 +894,13 @@ export default function AdminPage() {
 
       return searchable.includes(query);
     });
-  }, [artistSearch, showHiddenTagMissingOnly, showToonbtiMissingOnly, sortedArtists]);
+  }, [
+    artistSearch,
+    showCharacterMissingOnly,
+    showHiddenTagMissingOnly,
+    showToonbtiMissingOnly,
+    sortedArtists
+  ]);
 
   const hiddenTagMissingCount = useMemo(
     () =>
@@ -911,9 +922,20 @@ export default function AdminPage() {
     [sortedArtists]
   );
 
+  const characterMissingCount = useMemo(
+    () => sortedArtists.filter((artist) => artist.character_url.trim().length === 0).length,
+    [sortedArtists]
+  );
+
   useEffect(() => {
     setArtistPage(1);
-  }, [artistSearch, activeTab, showHiddenTagMissingOnly, showToonbtiMissingOnly]);
+  }, [
+    artistSearch,
+    activeTab,
+    showCharacterMissingOnly,
+    showHiddenTagMissingOnly,
+    showToonbtiMissingOnly
+  ]);
 
   const totalArtistPages = Math.max(1, Math.ceil(filteredSortedArtists.length / ADMIN_ARTISTS_PER_PAGE));
   const safeArtistPage = Math.min(artistPage, totalArtistPages);
@@ -1102,6 +1124,13 @@ export default function AdminPage() {
                 className={`pill-button ${showToonbtiMissingOnly ? "pill-button-active" : ""}`}
               >
                 툰비티아이 누락만 {formatNumber(toonbtiMissingCount)}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCharacterMissingOnly((current) => !current)}
+                className={`pill-button ${showCharacterMissingOnly ? "pill-button-active" : ""}`}
+              >
+                누끼 PNG 누락만 {formatNumber(characterMissingCount)}
               </button>
             </div>
 
