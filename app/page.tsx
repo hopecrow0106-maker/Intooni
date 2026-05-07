@@ -9,6 +9,7 @@ import {
   type FollowerRangeKey,
   type GenreFilterItem
 } from "@/components/FilterBar";
+import { ADSENSE_SLOTS, GoogleAd } from "@/components/GoogleAd";
 import { ArtistCard } from "@/components/ArtistCard";
 import { ArtistModal } from "@/components/ArtistModal";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
@@ -104,7 +105,39 @@ function pickRandomArtistByGenre(artists: Artist[], genre: string) {
 }
 
 function AdSidebarPlaceholder() {
-  return <div className="sticky top-20 min-h-[600px] w-[160px] rounded-lg bg-gray-100/40" />;
+  return (
+    <GoogleAd
+      slot={ADSENSE_SLOTS.leftSidebar}
+      label="데스크톱 왼쪽 광고"
+      className="sticky top-20 min-h-[600px] w-[160px]"
+      format="vertical"
+      fullWidthResponsive={false}
+    />
+  );
+}
+
+function RightAdSidebar() {
+  return (
+    <GoogleAd
+      slot={ADSENSE_SLOTS.rightSidebar}
+      label="데스크톱 오른쪽 광고"
+      className="sticky top-20 min-h-[600px] w-[160px]"
+      format="vertical"
+      fullWidthResponsive={false}
+    />
+  );
+}
+
+function SectionBannerAd() {
+  return (
+    <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
+      <GoogleAd
+        slot={ADSENSE_SLOTS.sectionBanner}
+        label="섹션 사이 배너 광고"
+        className="min-h-[90px] w-full"
+      />
+    </section>
+  );
 }
 
 function ArtistSkeletonCard() {
@@ -1013,6 +1046,8 @@ export default function HomePage() {
             </section>
           ) : null}
 
+          {!isSearching && featuredNewArtists.length > 0 ? <SectionBannerAd /> : null}
+
           <section ref={searchResultsRef} className="mx-auto max-w-[1200px] px-5 pb-20 md:px-8">
             <div className="mb-5 flex items-baseline justify-between">
               <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
@@ -1024,7 +1059,7 @@ export default function HomePage() {
             </div>
 
             {showLoadingState ? (
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
                 {Array.from({ length: 8 }).map((_, index) => (
                   <ArtistSkeletonCard key={index} />
                 ))}
@@ -1080,7 +1115,7 @@ export default function HomePage() {
                 ) : null}
 
                 {regularVisibleArtists.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
                     {regularVisibleArtists.map((artist, index) => (
                       <ArtistCard
                         key={artist.id}
@@ -1137,7 +1172,7 @@ export default function HomePage() {
         </div>
 
         <aside className="hidden xl:block">
-          <AdSidebarPlaceholder />
+          <RightAdSidebar />
         </aside>
       </main>
 

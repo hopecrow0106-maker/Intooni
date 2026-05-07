@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ADSENSE_SLOTS, GoogleAd } from "@/components/GoogleAd";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/placeholders";
 import { getSupabaseAdminClient, getSupabasePublicServerClient } from "@/lib/supabase";
@@ -85,8 +86,16 @@ function parseContent(content: string): ContentBlock[] {
   return blocks;
 }
 
-function AdSidebarPlaceholder() {
-  return <div className="sticky top-20 min-h-[600px] w-[160px] rounded-lg bg-gray-100/40" />;
+function AdSidebar({ side }: { side: "left" | "right" }) {
+  return (
+    <GoogleAd
+      slot={side === "left" ? ADSENSE_SLOTS.leftSidebar : ADSENSE_SLOTS.rightSidebar}
+      label={side === "left" ? "데스크톱 왼쪽 광고" : "데스크톱 오른쪽 광고"}
+      className="sticky top-20 min-h-[600px] w-[160px]"
+      format="vertical"
+      fullWidthResponsive={false}
+    />
+  );
 }
 
 function getTextBlockClass(
@@ -151,7 +160,7 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
   return (
     <main className="mx-auto w-full max-w-[1520px] px-4 py-8 md:px-6 md:py-12 xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
       <aside className="hidden xl:block">
-        <AdSidebarPlaceholder />
+        <AdSidebar side="left" />
       </aside>
 
       <div className="min-w-0">
@@ -290,7 +299,7 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
       </div>
 
       <aside className="hidden xl:block">
-        <AdSidebarPlaceholder />
+        <AdSidebar side="right" />
       </aside>
     </main>
   );

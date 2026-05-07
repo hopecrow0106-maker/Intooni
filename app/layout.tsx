@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Noto_Sans_KR, Plus_Jakarta_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -79,6 +80,13 @@ export default function RootLayout({
         }}
       >
         {children}
+        <Script
+          id="adsense-script"
+          async
+          strategy="afterInteractive"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8362832465607393"
+          crossOrigin="anonymous"
+        />
         <Analytics />
       </body>
     </html>
