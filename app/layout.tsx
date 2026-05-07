@@ -31,11 +31,8 @@ export const metadata: Metadata = {
   description: defaultDescription,
   applicationName: SITE_NAME,
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" }
-    ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+    icon: [{ url: "/intoonismall.png", type: "image/png" }],
+    apple: [{ url: "/intoonismall.png", type: "image/png" }]
   },
   keywords: [
     "인투니",
