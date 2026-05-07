@@ -165,13 +165,13 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
       </aside>
 
       <div className="min-w-0">
-        <article className="mx-auto max-w-5xl space-y-8">
-          <div className="overflow-hidden rounded-[28px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_16px_40px_rgba(0,0,0,0.06)]">
+        <article className="mx-auto max-w-[820px] space-y-8">
+          <div className="mx-auto max-w-[760px] overflow-hidden rounded-[28px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_16px_40px_rgba(0,0,0,0.06)]">
             <div className="bg-[#f2f0ec]">
               <img
                 src={magazine.thumbnail_url || MAGAZINE_RECT_PLACEHOLDER}
                 alt={magazine.title}
-                className="h-auto w-full object-contain"
+                className="h-auto max-h-[560px] w-full object-contain"
               />
             </div>
           </div>
@@ -234,14 +234,14 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
                 return (
                   <div
                     key={`image-${index}`}
-                    className={block.size === "wide" ? "space-y-2" : "mx-auto max-w-2xl space-y-2"}
+                    className={block.size === "wide" ? "mx-auto max-w-[760px] space-y-2" : "mx-auto max-w-[560px] space-y-2"}
                   >
                     <div className="overflow-hidden rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-[#f2f0ec] shadow-[0_12px_28px_rgba(0,0,0,0.05)]">
                       <div>
                         <img
                           src={block.url}
                           alt={`${magazine.title} 본문 이미지 ${index + 1}`}
-                          className="h-auto w-full object-contain"
+                          className="h-auto max-h-[680px] w-full object-contain"
                         />
                       </div>
                     </div>

@@ -34,6 +34,20 @@ type UploadingState = {
 
 type TextBlockSize = "small" | "body" | "large" | "title";
 type TextBlockAlign = "left" | "center" | "right";
+type EditorMode = "visual" | "raw";
+
+type ContentPreviewBlock =
+  | { type: "paragraph"; value: string }
+  | {
+      type: "text";
+      value: string;
+      size: TextBlockSize;
+      align: TextBlockAlign;
+      bold: boolean;
+    }
+  | { type: "image"; url: string; size: "wide" | "medium" }
+  | { type: "instagram"; url: string }
+  | { type: "divider" };
 
 const EMPTY_INSTAGRAM_URLS = ["", "", "", ""];
 
@@ -82,6 +96,64 @@ function buildInstagramToken(url: string) {
   return `\n\n{{instagram:${url}}}\n\n`;
 }
 
+function parseContentPreview(content: string): ContentPreviewBlock[] {
+  const blocks: ContentPreviewBlock[] = [];
+  const tokenRegex =
+    /\{\{divider\}\}|\{\{instagram:(.+?)\}\}|\{\{(image|text):(.+?)\|(wide|medium|small|body|large|title)(?:\|(left|center|right))?(?:\|(bold|normal))?\}\}/g;
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(content)) !== null) {
+    const before = content.slice(lastIndex, match.index).trim();
+    if (before) {
+      blocks.push({ type: "paragraph", value: before });
+    }
+
+    if (match[0] === "{{divider}}") {
+      blocks.push({ type: "divider" });
+    } else if (match[1]) {
+      blocks.push({ type: "instagram", url: match[1] });
+    } else if (match[2] === "image") {
+      blocks.push({
+        type: "image",
+        url: match[3],
+        size: match[4] as "wide" | "medium"
+      });
+    } else {
+      blocks.push({
+        type: "text",
+        value: match[3],
+        size: match[4] as TextBlockSize,
+        align: (match[5] as TextBlockAlign | undefined) ?? "left",
+        bold: match[6] === "bold"
+      });
+    }
+
+    lastIndex = tokenRegex.lastIndex;
+  }
+
+  const tail = content.slice(lastIndex).trim();
+  if (tail) {
+    blocks.push({ type: "paragraph", value: tail });
+  }
+
+  return blocks;
+}
+
+function getPreviewTextClass(size: TextBlockSize, align: TextBlockAlign, bold: boolean) {
+  const sizeClass = {
+    small: "text-[13px] leading-7 text-slate-500",
+    body: "text-[15px] leading-8 text-slate-700",
+    large: "text-xl leading-8 text-ink",
+    title: "text-2xl font-extrabold leading-tight text-ink"
+  }[size];
+  const alignClass =
+    align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
+
+  return `${sizeClass} ${bold ? "font-bold" : ""} ${alignClass}`;
+}
+
 export function MagazineForm({
   isOpen,
   initialMagazine,
@@ -98,6 +170,11 @@ export function MagazineForm({
   const [artistSearch, setArtistSearch] = useState("");
   const [inlineInstagramUrl, setInlineInstagramUrl] = useState("");
   const [formMessage, setFormMessage] = useState("");
+  const [editorMode, setEditorMode] = useState<EditorMode>("visual");
+  const [draftText, setDraftText] = useState("");
+  const [draftSize, setDraftSize] = useState<TextBlockSize>("body");
+  const [draftAlign, setDraftAlign] = useState<TextBlockAlign>("left");
+  const [draftBold, setDraftBold] = useState(false);
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -106,6 +183,11 @@ export function MagazineForm({
     setArtistSearch("");
     setInlineInstagramUrl("");
     setFormMessage("");
+    setEditorMode("visual");
+    setDraftText("");
+    setDraftSize("body");
+    setDraftAlign("left");
+    setDraftBold(false);
   }, [initialMagazine, isOpen]);
 
   useEffect(() => {
@@ -122,6 +204,7 @@ export function MagazineForm({
   }, [isOpen]);
 
   const isBusy = saving || uploading.thumbnail || uploading.inlineImage;
+  const contentPreviewBlocks = useMemo(() => parseContentPreview(form.content), [form.content]);
 
   const selectedArtistSet = useMemo(
     () => new Set(form.related_artist_ids),
@@ -231,6 +314,19 @@ export function MagazineForm({
     setFormMessage("");
   };
 
+  const appendDraftText = () => {
+    const value = draftText.trim();
+
+    if (!value) {
+      setFormMessage("본문에 넣을 문장을 입력해 주세요.");
+      return;
+    }
+
+    insertContentToken(buildTextToken(value, draftSize, draftAlign, draftBold));
+    setDraftText("");
+    setFormMessage("");
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-ink/50" onClick={onClose}>
       <div
@@ -258,6 +354,11 @@ export function MagazineForm({
           onSubmit={async (event) => {
             event.preventDefault();
             setFormMessage("");
+
+            if (!form.content.trim()) {
+              setFormMessage("본문을 한 개 이상 추가해 주세요.");
+              return;
+            }
 
             await onSave({
               ...form,
@@ -401,19 +502,176 @@ export function MagazineForm({
 
           <section className="space-y-5">
 
-          <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-600">본문</span>
-            <textarea
-              ref={contentTextareaRef}
-              required
-              rows={12}
-              value={form.content}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, content: event.target.value }))
-              }
-              className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-            />
-          </label>
+          <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">블로그 편집기</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  본문은 카드 미리보기로 확인하고, 원문 토큰은 필요할 때만 열어 편집합니다.
+                </p>
+              </div>
+              <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setEditorMode("visual")}
+                  className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                    editorMode === "visual" ? "bg-ink text-white" : "text-slate-500"
+                  }`}
+                >
+                  편집기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorMode("raw")}
+                  className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                    editorMode === "raw" ? "bg-ink text-white" : "text-slate-500"
+                  }`}
+                >
+                  원문
+                </button>
+              </div>
+            </div>
+
+            {editorMode === "visual" ? (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-[20px] border border-slate-100 bg-slate-50 p-3">
+                  <textarea
+                    rows={4}
+                    value={draftText}
+                    onChange={(event) => setDraftText(event.target.value)}
+                    placeholder="문장을 입력한 뒤 아래 스타일을 고르고 추가하세요."
+                    className="w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ink"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <select
+                      value={draftSize}
+                      onChange={(event) => setDraftSize(event.target.value as TextBlockSize)}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none"
+                    >
+                      <option value="body">본문</option>
+                      <option value="title">제목</option>
+                      <option value="large">큰 문장</option>
+                      <option value="small">작은 설명</option>
+                    </select>
+                    <select
+                      value={draftAlign}
+                      onChange={(event) => setDraftAlign(event.target.value as TextBlockAlign)}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none"
+                    >
+                      <option value="left">왼쪽</option>
+                      <option value="center">가운데</option>
+                      <option value="right">오른쪽</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setDraftBold((current) => !current)}
+                      className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                        draftBold
+                          ? "border-ink bg-ink text-white"
+                          : "border-slate-200 bg-white text-slate-600"
+                      }`}
+                    >
+                      굵게
+                    </button>
+                    <button
+                      type="button"
+                      onClick={appendDraftText}
+                      className="rounded-full bg-coral px-4 py-2 text-xs font-semibold text-white"
+                    >
+                      문장 추가
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-[20px] border border-slate-100 bg-white p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-700">본문 미리보기</p>
+                    <span className="text-xs text-slate-400">{contentPreviewBlocks.length}개 블록</span>
+                  </div>
+                  {contentPreviewBlocks.length > 0 ? (
+                    <div className="space-y-4">
+                      {contentPreviewBlocks.map((block, index) => {
+                        if (block.type === "paragraph") {
+                          return (
+                            <p
+                              key={`preview-paragraph-${index}`}
+                              className="whitespace-pre-wrap text-[15px] leading-8 text-slate-700"
+                            >
+                              {block.value}
+                            </p>
+                          );
+                        }
+
+                        if (block.type === "text") {
+                          return (
+                            <div
+                              key={`preview-text-${index}`}
+                              className={getPreviewTextClass(block.size, block.align, block.bold)}
+                            >
+                              <p className="whitespace-pre-wrap">{block.value}</p>
+                            </div>
+                          );
+                        }
+
+                        if (block.type === "image") {
+                          return (
+                            <div
+                              key={`preview-image-${index}`}
+                              className={block.size === "wide" ? "mx-auto max-w-3xl" : "mx-auto max-w-xl"}
+                            >
+                              <div className="relative overflow-hidden rounded-[18px] border border-slate-100 bg-slate-50">
+                                <Image
+                                  src={block.url}
+                                  alt="본문 이미지 미리보기"
+                                  width={1200}
+                                  height={800}
+                                  className="h-auto max-h-[520px] w-full object-contain"
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (block.type === "instagram") {
+                          return (
+                            <div
+                              key={`preview-instagram-${index}`}
+                              className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500"
+                            >
+                              인스타 임베드: {block.url}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={`preview-divider-${index}`} className="py-3">
+                            <div className="h-px bg-slate-200" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-[18px] border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-400">
+                      아직 본문 블록이 없습니다.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <label className="mt-4 block space-y-2">
+                <span className="text-sm font-medium text-slate-600">원문 토큰 편집</span>
+                <textarea
+                  ref={contentTextareaRef}
+                  rows={14}
+                  value={form.content}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, content: event.target.value }))
+                  }
+                  className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 font-mono text-xs outline-none transition focus:border-ink"
+                />
+              </label>
+            )}
+          </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
