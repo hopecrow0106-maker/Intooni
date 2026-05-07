@@ -4,6 +4,7 @@ import { Noto_Sans_KR, Plus_Jakarta_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 
 import "@/app/globals.css";
+import { ADSENSE_ENABLED } from "@/components/GoogleAd";
 import { getSiteUrl, SITE_NAME } from "@/lib/site";
 
 const jakartaSans = Plus_Jakarta_Sans({
@@ -80,13 +81,15 @@ export default function RootLayout({
         }}
       >
         {children}
-        <Script
-          id="adsense-script"
-          async
-          strategy="afterInteractive"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8362832465607393"
-          crossOrigin="anonymous"
-        />
+        {ADSENSE_ENABLED ? (
+          <Script
+            id="adsense-script"
+            async
+            strategy="afterInteractive"
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8362832465607393"
+            crossOrigin="anonymous"
+          />
+        ) : null}
         <Analytics />
       </body>
     </html>

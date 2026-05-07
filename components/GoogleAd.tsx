@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 const ADSENSE_CLIENT = "ca-pub-8362832465607393";
+export const ADSENSE_ENABLED = false;
 
 declare global {
   interface Window {
@@ -29,6 +30,10 @@ export function GoogleAd({
   const requestedRef = useRef(false);
 
   useEffect(() => {
+    if (!ADSENSE_ENABLED) {
+      return;
+    }
+
     const element = adRef.current;
     if (!element || requestedRef.current) {
       return;
@@ -53,6 +58,10 @@ export function GoogleAd({
 
     return () => window.cancelAnimationFrame(frame);
   }, [slot]);
+
+  if (!ADSENSE_ENABLED) {
+    return null;
+  }
 
   return (
     <div
