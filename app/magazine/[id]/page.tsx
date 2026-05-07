@@ -3,8 +3,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ADSENSE_SLOTS, GoogleAd } from "@/components/GoogleAd";
+import { GoogleAd } from "@/components/GoogleAd";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/placeholders";
 import { getSupabaseAdminClient, getSupabasePublicServerClient } from "@/lib/supabase";
 import type { Artist } from "@/lib/types";

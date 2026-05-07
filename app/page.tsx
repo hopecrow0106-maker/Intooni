@@ -9,11 +9,12 @@ import {
   type FollowerRangeKey,
   type GenreFilterItem
 } from "@/components/FilterBar";
-import { ADSENSE_SLOTS, GoogleAd } from "@/components/GoogleAd";
+import { GoogleAd } from "@/components/GoogleAd";
 import { ArtistCard } from "@/components/ArtistCard";
 import { ArtistModal } from "@/components/ArtistModal";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { SearchBar } from "@/components/SearchBar";
+import { ADSENSE_SLOTS } from "@/lib/adsense";
 import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/placeholders";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { Artist, Category, Magazine } from "@/lib/types";
