@@ -5,6 +5,9 @@ import { getErrorMessage } from "@/lib/api-error";
 import { getSupabaseAdminClient, getSupabasePublicServerClient } from "@/lib/supabase";
 import type { MagazineInsert } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function unauthorizedResponse() {
   return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 }
@@ -41,7 +44,11 @@ export async function GET() {
       throw error;
     }
 
-    return NextResponse.json(data ?? []);
+    return NextResponse.json(data ?? [], {
+      headers: {
+        "Cache-Control": "no-store"
+      }
+    });
   } catch (error) {
     return NextResponse.json(
       { message: getErrorMessage(error, "매거진 목록을 불러오지 못했습니다.") },

@@ -946,10 +946,16 @@ export default function AdminPage() {
 
   const sortedMagazines = useMemo(
     () =>
-      [...magazines].sort(
-        (a, b) =>
-          new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
-      ),
+      [...magazines].sort((a, b) => {
+        const publishedDiff =
+          new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
+
+        if (publishedDiff !== 0) {
+          return publishedDiff;
+        }
+
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }),
     [magazines]
   );
 

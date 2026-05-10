@@ -10,6 +10,9 @@ import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/plac
 import { getSupabaseAdminClient, getSupabasePublicServerClient } from "@/lib/supabase";
 import type { Artist } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type MagazineDetailPageProps = {
   params: {
     id: string;
@@ -39,6 +42,10 @@ function getArtistSlug(artist: { id: string; instagram_handle: string }) {
   return encodeURIComponent(handle || artist.id);
 }
 
+function stripHtmlTags(value: string) {
+  return value.replace(/<[^>]*>/g, "").trim();
+}
+
 function parseContent(content: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const tokenRegex =
@@ -48,7 +55,7 @@ function parseContent(content: string): ContentBlock[] {
   let match: RegExpExecArray | null;
 
   while ((match = tokenRegex.exec(content)) !== null) {
-    const before = content.slice(lastIndex, match.index).trim();
+    const before = stripHtmlTags(content.slice(lastIndex, match.index));
     if (before) {
       blocks.push({ type: "paragraph", value: before });
     }
@@ -69,7 +76,7 @@ function parseContent(content: string): ContentBlock[] {
     } else {
       blocks.push({
         type: "text",
-        value: match[3],
+        value: stripHtmlTags(match[3]),
         size: match[4] as "small" | "body" | "large" | "title",
         align: (match[5] as "left" | "center" | "right" | undefined) ?? "left",
         bold: match[6] === "bold"
@@ -79,7 +86,7 @@ function parseContent(content: string): ContentBlock[] {
     lastIndex = tokenRegex.lastIndex;
   }
 
-  const tail = content.slice(lastIndex).trim();
+  const tail = stripHtmlTags(content.slice(lastIndex));
   if (tail) {
     blocks.push({ type: "paragraph", value: tail });
   }

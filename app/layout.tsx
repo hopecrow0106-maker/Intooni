@@ -20,7 +20,7 @@ const notoKr = Noto_Sans_KR({
 });
 
 const siteUrl = getSiteUrl();
-const ogImageUrl = `${siteUrl}/og-home.png`;
+const ogImageUrl = `${siteUrl}/intoonismall.png`;
 const defaultTitle = `${SITE_NAME} | 기억 안 나는 인스타툰 찾기`;
 const defaultDescription =
   "작가 이름이 생각 안 날 때, 해시태그와 키워드로 인스타툰 작가를 찾아보세요. 썰툰, 일상툰, 연애툰부터 랜덤 추천까지 한 곳에서 발견해요.";
@@ -32,6 +32,7 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   icons: {
     icon: [{ url: "/intoonismall.png", type: "image/png" }],
+    shortcut: [{ url: "/intoonismall.png", type: "image/png" }],
     apple: [{ url: "/intoonismall.png", type: "image/png" }]
   },
   keywords: [
@@ -56,8 +57,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: ogImageUrl,
-        width: 1200,
-        height: 630,
+        width: 912,
+        height: 912,
         alt: "인투니 공유 이미지"
       }
     ]

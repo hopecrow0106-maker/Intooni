@@ -363,7 +363,8 @@ export default function HomePage() {
             .from("magazines")
             .select("*")
             .eq("is_public", true)
-            .order("published_at", { ascending: false }),
+            .order("published_at", { ascending: false })
+            .order("created_at", { ascending: false }),
           supabase
             .from("artists")
             .select("*")

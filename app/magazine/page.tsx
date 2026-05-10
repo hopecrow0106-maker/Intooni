@@ -3,13 +3,17 @@ import Link from "next/link";
 
 import { getSupabasePublicServerClient } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function MagazineListPage() {
   const supabase = getSupabasePublicServerClient();
   const { data: magazines } = await supabase
     .from("magazines")
     .select("*")
     .eq("is_public", true)
-    .order("published_at", { ascending: false });
+    .order("published_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
   const items = magazines ?? [];
 

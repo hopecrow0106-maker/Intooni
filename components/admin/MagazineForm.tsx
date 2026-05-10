@@ -96,6 +96,10 @@ function buildInstagramToken(url: string) {
   return `\n\n{{instagram:${url}}}\n\n`;
 }
 
+function stripHtmlTags(value: string) {
+  return value.replace(/<[^>]*>/g, "").trim();
+}
+
 function parseContentPreview(content: string): ContentPreviewBlock[] {
   const blocks: ContentPreviewBlock[] = [];
   const tokenRegex =
@@ -105,7 +109,7 @@ function parseContentPreview(content: string): ContentPreviewBlock[] {
   let match: RegExpExecArray | null;
 
   while ((match = tokenRegex.exec(content)) !== null) {
-    const before = content.slice(lastIndex, match.index).trim();
+    const before = stripHtmlTags(content.slice(lastIndex, match.index));
     if (before) {
       blocks.push({ type: "paragraph", value: before });
     }
@@ -123,7 +127,7 @@ function parseContentPreview(content: string): ContentPreviewBlock[] {
     } else {
       blocks.push({
         type: "text",
-        value: match[3],
+        value: stripHtmlTags(match[3]),
         size: match[4] as TextBlockSize,
         align: (match[5] as TextBlockAlign | undefined) ?? "left",
         bold: match[6] === "bold"
@@ -133,7 +137,7 @@ function parseContentPreview(content: string): ContentPreviewBlock[] {
     lastIndex = tokenRegex.lastIndex;
   }
 
-  const tail = content.slice(lastIndex).trim();
+  const tail = stripHtmlTags(content.slice(lastIndex));
   if (tail) {
     blocks.push({ type: "paragraph", value: tail });
   }
@@ -315,7 +319,7 @@ export function MagazineForm({
   };
 
   const appendDraftText = () => {
-    const value = draftText.trim();
+    const value = stripHtmlTags(draftText);
 
     if (!value) {
       setFormMessage("본문에 넣을 문장을 입력해 주세요.");
@@ -808,7 +812,7 @@ export function MagazineForm({
               </div>
             </div>
 
-            <div className="mt-4 space-y-2 text-xs text-slate-400">
+            <div className="hidden">
               <p>{"{{image:URL|wide}}"} / {"{{image:URL|medium}}"} 형식으로 이미지가 저장됩니다.</p>
               <p>
                 {"{{text:문장|title|left|bold}}"} 또는 {"{{text:문장|body|center|normal}}"} 형식으로 텍스트가 저장됩니다.
