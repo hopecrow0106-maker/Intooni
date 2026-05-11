@@ -85,7 +85,8 @@ function buildTextToken(
   align: TextBlockAlign,
   bold = false
 ) {
-  return `\n\n{{text:${value}|${size}|${align}|${bold ? "bold" : "normal"}}}\n\n`;
+  const safeValue = value.replace(/\{\{/g, "｛｛").replace(/\}\}/g, "｝｝").replace(/\|/g, "｜");
+  return `\n\n{{text:${safeValue}|${size}|${align}|${bold ? "bold" : "normal"}}}\n\n`;
 }
 
 function buildDividerToken() {
@@ -100,6 +101,15 @@ function stripHtmlTags(value: string) {
   return value.replace(/<[^>]*>/g, "").trim();
 }
 
+function cleanVisibleText(value: string) {
+  return stripHtmlTags(
+    value
+      .replace(/\{\{[\s\S]*?\}\}/g, "")
+      .replace(/\{\{[\s\S]*$/g, "")
+      .replace(/[{}]/g, "")
+  );
+}
+
 function parseContentPreview(content: string): ContentPreviewBlock[] {
   const blocks: ContentPreviewBlock[] = [];
   const tokenRegex =
@@ -109,7 +119,7 @@ function parseContentPreview(content: string): ContentPreviewBlock[] {
   let match: RegExpExecArray | null;
 
   while ((match = tokenRegex.exec(content)) !== null) {
-    const before = stripHtmlTags(content.slice(lastIndex, match.index));
+    const before = cleanVisibleText(content.slice(lastIndex, match.index));
     if (before) {
       blocks.push({ type: "paragraph", value: before });
     }
@@ -127,7 +137,7 @@ function parseContentPreview(content: string): ContentPreviewBlock[] {
     } else {
       blocks.push({
         type: "text",
-        value: stripHtmlTags(match[3]),
+        value: cleanVisibleText(match[3]),
         size: match[4] as TextBlockSize,
         align: (match[5] as TextBlockAlign | undefined) ?? "left",
         bold: match[6] === "bold"
@@ -137,7 +147,7 @@ function parseContentPreview(content: string): ContentPreviewBlock[] {
     lastIndex = tokenRegex.lastIndex;
   }
 
-  const tail = stripHtmlTags(content.slice(lastIndex));
+  const tail = cleanVisibleText(content.slice(lastIndex));
   if (tail) {
     blocks.push({ type: "paragraph", value: tail });
   }
@@ -812,13 +822,13 @@ export function MagazineForm({
               </div>
             </div>
 
-            <div className="hidden">
+            {false ? <div className="hidden">
               <p>{"{{image:URL|wide}}"} / {"{{image:URL|medium}}"} 형식으로 이미지가 저장됩니다.</p>
               <p>
                 {"{{text:문장|title|left|bold}}"} 또는 {"{{text:문장|body|center|normal}}"} 형식으로 텍스트가 저장됩니다.
               </p>
               <p>{"{{instagram:URL}}"} 형식으로 본문 중간 인스타 임베드가 저장됩니다.</p>
-            </div>
+            </div> : null}
           </div>
 
           <div className="space-y-3">

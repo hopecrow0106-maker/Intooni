@@ -6,7 +6,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-const ALLOWED_FOLDERS = new Set(["artists", "characters", "magazines"]);
+const ALLOWED_FOLDERS = new Set(["artists", "characters", "magazines", "toonbti"]);
 
 type FileLike = Blob & {
   name?: string;
@@ -96,4 +96,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

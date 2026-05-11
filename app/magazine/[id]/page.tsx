@@ -46,6 +46,15 @@ function stripHtmlTags(value: string) {
   return value.replace(/<[^>]*>/g, "").trim();
 }
 
+function cleanVisibleText(value: string) {
+  return stripHtmlTags(
+    value
+      .replace(/\{\{[\s\S]*?\}\}/g, "")
+      .replace(/\{\{[\s\S]*$/g, "")
+      .replace(/[{}]/g, "")
+  );
+}
+
 function parseContent(content: string): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const tokenRegex =
@@ -55,7 +64,7 @@ function parseContent(content: string): ContentBlock[] {
   let match: RegExpExecArray | null;
 
   while ((match = tokenRegex.exec(content)) !== null) {
-    const before = stripHtmlTags(content.slice(lastIndex, match.index));
+    const before = cleanVisibleText(content.slice(lastIndex, match.index));
     if (before) {
       blocks.push({ type: "paragraph", value: before });
     }
@@ -76,7 +85,7 @@ function parseContent(content: string): ContentBlock[] {
     } else {
       blocks.push({
         type: "text",
-        value: stripHtmlTags(match[3]),
+        value: cleanVisibleText(match[3]),
         size: match[4] as "small" | "body" | "large" | "title",
         align: (match[5] as "left" | "center" | "right" | undefined) ?? "left",
         bold: match[6] === "bold"
@@ -86,7 +95,7 @@ function parseContent(content: string): ContentBlock[] {
     lastIndex = tokenRegex.lastIndex;
   }
 
-  const tail = stripHtmlTags(content.slice(lastIndex));
+  const tail = cleanVisibleText(content.slice(lastIndex));
   if (tail) {
     blocks.push({ type: "paragraph", value: tail });
   }

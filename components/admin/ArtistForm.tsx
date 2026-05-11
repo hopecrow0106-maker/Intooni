@@ -732,8 +732,8 @@ export function ArtistForm({
           />
 
           <TagSection
-            label="툰비티아이 분위기"
-            helper="예: 개그, 잔잔, 달달, 고자극, 귀여움"
+            label="툰비티아이 Tone"
+            helper="이걸 보는 시청자는 어떤 감정을 느낄 것인가?"
             inputValue={moodInput}
             onInputChange={setMoodInput}
             onAdd={() => addArrayValue("mood_tags", moodInput, () => setMoodInput(""))}

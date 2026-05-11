@@ -7,6 +7,7 @@ import { ArtistForm, type ArtistFormValues } from "@/components/admin/ArtistForm
 import { ArtistTable } from "@/components/admin/ArtistTable";
 import { MagazineForm, type MagazineFormValues } from "@/components/admin/MagazineForm";
 import { MagazineTable } from "@/components/admin/MagazineTable";
+import { ToonbtiRouteMapBuilder } from "@/components/admin/ToonbtiRouteMapBuilder";
 import { ToonbtiTagManager } from "@/components/admin/ToonbtiTagManager";
 import {
   type ArtistStatsPeriod,
@@ -1048,7 +1049,11 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 md:px-6 md:py-8">
+    <main
+      className={`mx-auto min-h-screen w-full px-4 py-6 md:px-6 md:py-8 ${
+        activeTab === "toonbti" ? "max-w-none 2xl:px-10" : "max-w-7xl"
+      }`}
+    >
       <section className="panel-surface px-6 py-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -1283,7 +1288,8 @@ export default function AdminPage() {
           </section>
         </>
       ) : (
-        <section className="mt-6">
+        <section className="mt-6 space-y-6">
+          <ToonbtiRouteMapBuilder artists={sortedArtists} />
           <ToonbtiTagManager
             artists={sortedArtists}
             saving={saving}
