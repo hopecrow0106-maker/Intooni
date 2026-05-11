@@ -12,6 +12,8 @@ import {
 } from "@/lib/artist-events";
 import { getSupabaseAdminClient } from "@/lib/supabase";
 
+const ARTIST_EVENT_LOG_PAGE_SIZE = 1000;
+
 function unauthorizedResponse() {
   return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 }
@@ -64,33 +66,42 @@ export async function GET(request: Request) {
         : "all";
 
     const supabase = getSupabaseAdminClient();
-    let query = supabase
-      .from("artist_event_logs")
-      .select("artist_id, event_type, created_at")
-      .order("created_at", { ascending: false });
-
     const threshold = getArtistStatsThreshold(period);
-    if (threshold) {
-      query = query.gte("created_at", threshold);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      throw error;
-    }
-
     const byArtist = new Map<string, ArtistStatsSummary>();
 
-    (data ?? []).forEach((item) => {
-      const current = byArtist.get(item.artist_id) ?? {
-        artist_id: item.artist_id,
-        ...EMPTY_ARTIST_STATS
-      };
+    for (let page = 0; ; page += 1) {
+      const from = page * ARTIST_EVENT_LOG_PAGE_SIZE;
+      const to = from + ARTIST_EVENT_LOG_PAGE_SIZE - 1;
+      let query = supabase
+        .from("artist_event_logs")
+        .select("artist_id, event_type")
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-      current[item.event_type] += 1;
-      byArtist.set(item.artist_id, current);
-    });
+      if (threshold) {
+        query = query.gte("created_at", threshold);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      (data ?? []).forEach((item) => {
+        const current = byArtist.get(item.artist_id) ?? {
+          artist_id: item.artist_id,
+          ...EMPTY_ARTIST_STATS
+        };
+
+        current[item.event_type] += 1;
+        byArtist.set(item.artist_id, current);
+      });
+
+      if (!data || data.length < ARTIST_EVENT_LOG_PAGE_SIZE) {
+        break;
+      }
+    }
 
     return NextResponse.json({
       period,
@@ -103,4 +114,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

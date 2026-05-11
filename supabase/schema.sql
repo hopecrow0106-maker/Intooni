@@ -90,9 +90,34 @@ create table if not exists public.artist_event_logs (
   id uuid primary key default gen_random_uuid(),
   artist_id uuid not null references public.artists(id) on delete cascade,
   event_type text not null check (
-    event_type in ('profile_click', 'instagram_click', 'embed_click', 'hero_click')
+    event_type in (
+      'profile_click',
+      'instagram_click',
+      'embed_click',
+      'hero_click',
+      'toonbti_result_click',
+      'toonbti_character_click',
+      'random_click'
+    )
   ),
   created_at timestamptz not null default now()
+);
+
+alter table public.artist_event_logs
+drop constraint if exists artist_event_logs_event_type_check;
+
+alter table public.artist_event_logs
+add constraint artist_event_logs_event_type_check
+check (
+  event_type in (
+    'profile_click',
+    'instagram_click',
+    'embed_click',
+    'hero_click',
+    'toonbti_result_click',
+    'toonbti_character_click',
+    'random_click'
+  )
 );
 
 create table if not exists public.search_query_logs (
