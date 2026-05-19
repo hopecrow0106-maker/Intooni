@@ -112,6 +112,49 @@ const MOBILE_FLOATING_CHARACTER_POSITIONS = [
   "left-[19%] bottom-3 h-16 w-16",
   "right-[24%] bottom-0 h-24 w-24"
 ];
+const TOONBTI_MAINTENANCE = true;
+
+function ToonbtiMaintenancePage() {
+  return (
+    <main className="min-h-screen bg-[#f8f7f4] text-[#1a1a1a]">
+      <nav className="sticky top-0 z-40 flex h-[60px] items-center justify-between border-b border-[rgba(0,0,0,0.07)] bg-[rgba(248,247,244,0.93)] px-5 backdrop-blur-md md:px-8">
+        <Link href="/" className="font-moyamoya text-[22px] text-[#ff4d6d]">
+          인투니<span className="text-[#1a1a1a]">.</span>
+        </Link>
+        <Link
+          href="/"
+          className="rounded-full border border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-sm font-bold text-[#6b6b6b] transition hover:border-[#ff4d6d] hover:text-[#ff4d6d]"
+        >
+          홈으로
+        </Link>
+      </nav>
+
+      <section className="mx-auto flex min-h-[calc(100vh-60px)] w-full max-w-3xl items-center justify-center px-5 py-16 text-center md:px-8">
+        <div className="w-full rounded-[34px] border border-[#ffd6df] bg-white px-6 py-14 shadow-[0_24px_70px_rgba(255,77,109,0.12)] md:px-10">
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#ff4d6d]">
+            ToonBTI Update
+          </p>
+          <h1 className="mt-5 font-moyamoya text-4xl leading-tight text-[#1a1a1a] md:text-6xl">
+            툰비티아이는
+            <br />
+            개선중이에요!
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-[#6b6b6b]">
+            더 잘 맞는 결과와 추천을 보여드리려고 잠시 업데이트 중입니다.
+            조금만 기다려주세요.
+          </p>
+          <button
+            type="button"
+            disabled
+            className="mt-8 cursor-not-allowed rounded-full bg-[#d8d6d2] px-7 py-3 text-sm font-extrabold text-white shadow-none"
+          >
+            테스트 준비중
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
 
 function getOverlapCount(values: string[], selected: string[]) {
   const normalizedValues = new Set(values.map((value) => value.trim()).filter(Boolean));
@@ -365,7 +408,7 @@ function ResultInstagramCard({
   );
 }
 
-export default function ToonbtiPage() {
+function ToonbtiExperience() {
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const revealTimerRef = useRef<number | null>(null);
   const resultsRef = useRef<HTMLElement | null>(null);
@@ -811,4 +854,8 @@ export default function ToonbtiPage() {
       <ArtistModal artist={selectedArtist} onClose={() => setSelectedArtist(null)} />
     </main>
   );
+}
+
+export default function ToonbtiPage() {
+  return TOONBTI_MAINTENANCE ? <ToonbtiMaintenancePage /> : <ToonbtiExperience />;
 }
