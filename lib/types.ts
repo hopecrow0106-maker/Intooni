@@ -7,6 +7,12 @@ export type Artist = {
   genre: string;
   followers: number;
   post_count: number;
+  weekly_follower_growth: number;
+  weekly_post_growth: number;
+  weekly_follower_growth_rate: number;
+  weekly_post_growth_rate: number;
+  stats_period_start: string | null;
+  stats_period_end: string | null;
   hashtags: string[];
   hidden_tags: string[];
   mood_tags: string[];
@@ -26,8 +32,10 @@ export type Artist = {
   created_at: string;
 };
 
-export type ArtistInsert = Omit<Artist, "id" | "created_at"> & {
+export type ArtistInsert = Omit<Artist, "id" | "created_at" | "stats_period_start" | "stats_period_end"> & {
   id?: string;
+  stats_period_start?: string | null;
+  stats_period_end?: string | null;
   last_stats_updated_at?: string;
   created_at?: string;
 };

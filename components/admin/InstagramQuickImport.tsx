@@ -53,6 +53,7 @@ function guessPostUrls(links: string[]) {
 }
 
 export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
+  const [open, setOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [profileUrl, setProfileUrl] = useState("");
   const [postUrls, setPostUrls] = useState(["", "", "", ""]);
@@ -134,16 +135,25 @@ export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
   };
 
   return (
-    <section className="rounded-[24px] border border-[#ffd6df] bg-[#fff8fa] p-4 shadow-[0_14px_34px_rgba(255,77,109,0.08)]">
-      <div className="space-y-1">
-        <p className="text-sm font-bold text-coral">인스타 빠른 추가</p>
-        <p className="text-xs leading-5 text-slate-500">
-          프로필 링크와 대표 게시물 링크 4개를 붙여넣으면 기존 작가 폼에 가능한 값만 채워요.
-          저장은 아래 저장 버튼을 눌렀을 때만 됩니다.
-        </p>
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-slate-800">인스타 빠른 추가</p>
+          <p className="text-xs leading-5 text-slate-500">
+            프로필/게시물 링크를 붙여넣어 필요한 값만 자동 입력합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="self-start rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-ink hover:text-ink"
+        >
+          {open ? "접기" : "열기"}
+        </button>
       </div>
 
-      <div className="mt-4 space-y-3">
+      {open ? (
+      <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
         <label className="space-y-2">
           <span className="text-xs font-semibold text-slate-500">링크 5개 한 번에 붙여넣기</span>
           <textarea
@@ -151,7 +161,7 @@ export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
             onChange={(event) => applyBulkLinks(event.target.value)}
             placeholder={`https://www.instagram.com/example_artist/\nhttps://www.instagram.com/p/AAAA/\nhttps://www.instagram.com/p/BBBB/\nhttps://www.instagram.com/p/CCCC/\nhttps://www.instagram.com/p/DDDD/`}
             rows={5}
-            className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-coral"
+            className="w-full resize-none rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ink"
           />
         </label>
 
@@ -161,7 +171,7 @@ export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
             value={profileUrl}
             onChange={(event) => setProfileUrl(event.target.value)}
             placeholder="https://www.instagram.com/example_artist/"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-coral"
+            className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ink"
           />
         </label>
 
@@ -178,7 +188,7 @@ export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
                 })
               }
               placeholder={`대표 게시물 링크 ${index + 1}`}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-coral"
+              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ink"
             />
           ))}
         </div>
@@ -193,14 +203,14 @@ export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
           type="button"
           onClick={() => void importInstagram()}
           disabled={status === "loading"}
-          className="w-full rounded-full bg-coral px-5 py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(255,77,109,0.22)] transition hover:bg-[#e83a5a] disabled:cursor-wait disabled:opacity-70"
+          className="w-full rounded-lg bg-ink px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-700 disabled:cursor-wait disabled:opacity-70"
         >
           {status === "loading" ? "불러오는 중..." : "인스타 정보 불러오기"}
         </button>
 
         {message ? (
           <div
-            className={`rounded-2xl px-4 py-3 text-sm ${
+            className={`rounded-lg px-4 py-3 text-sm ${
               status === "error"
                 ? "border border-red-200 bg-red-50 text-red-700"
                 : status === "partial"
@@ -212,6 +222,7 @@ export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
           </div>
         ) : null}
       </div>
+      ) : null}
     </section>
   );
 }

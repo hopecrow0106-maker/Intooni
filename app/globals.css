@@ -2,6 +2,88 @@
 @tailwind components;
 @tailwind utilities;
 
+.magazine-rich-editor,
+.magazine-rich-preview {
+  word-break: keep-all;
+}
+
+.magazine-rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #cbd5e1;
+  pointer-events: none;
+}
+
+.magazine-rich-editor p,
+.magazine-rich-preview p {
+  margin: 0 0 1rem;
+  white-space: pre-wrap;
+}
+
+.magazine-rich-editor h2,
+.magazine-rich-preview h2 {
+  margin: 1.75rem 0 1rem;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.magazine-rich-editor h3,
+.magazine-rich-preview h3 {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.magazine-rich-editor ul,
+.magazine-rich-preview ul,
+.magazine-rich-editor ol,
+.magazine-rich-preview ol {
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+}
+
+.magazine-rich-editor ul,
+.magazine-rich-preview ul {
+  list-style: disc;
+}
+
+.magazine-rich-editor ol,
+.magazine-rich-preview ol {
+  list-style: decimal;
+}
+
+.magazine-rich-editor blockquote,
+.magazine-rich-preview blockquote {
+  margin: 1.25rem 0;
+  border-left: 4px solid #111827;
+  background: #f8fafc;
+  padding: 1rem 1.25rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.magazine-rich-editor cite,
+.magazine-rich-preview cite {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-style: normal;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.magazine-rich-editor font[size="2"],
+.magazine-rich-preview font[size="2"] {
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  color: #64748b;
+}
+
 @font-face {
   font-family: "Cafe24Moyamoya";
   src: url("/fonts/Cafe24Moyamoya-Face-v1.0.otf") format("opentype");
@@ -321,4 +403,59 @@ textarea {
 
 .animate-pulse-soft {
   animation: pulse-soft 1.5s ease-in-out infinite;
+}
+
+@keyframes growth-row-in {
+  from {
+    opacity: 0.72;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes growth-bar-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--growth-width, 0%);
+  }
+}
+
+@keyframes growth-value-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.growth-row {
+  animation: growth-row-in 360ms ease-out both;
+  animation-delay: var(--growth-delay, 0ms);
+}
+
+.growth-bar-fill {
+  width: var(--growth-width, 0%);
+  animation: growth-bar-fill 780ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  animation-delay: var(--growth-delay, 0ms);
+}
+
+.growth-value-pop {
+  animation: growth-value-pop 360ms ease-out both;
+  animation-delay: var(--growth-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .growth-row,
+  .growth-bar-fill,
+  .growth-value-pop {
+    animation: none;
+  }
 }

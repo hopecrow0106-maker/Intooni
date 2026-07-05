@@ -14,6 +14,12 @@ create table if not exists public.artists (
   genre text not null,
   followers integer not null default 0,
   post_count integer not null default 0,
+  weekly_follower_growth integer not null default 0,
+  weekly_post_growth integer not null default 0,
+  weekly_follower_growth_rate numeric not null default 0,
+  weekly_post_growth_rate numeric not null default 0,
+  stats_period_start date,
+  stats_period_end date,
   hashtags text[] not null default '{}',
   hidden_tags text[] not null default '{}',
   mood_tags text[] not null default '{}',
@@ -59,6 +65,24 @@ add column if not exists bio text not null default '';
 
 alter table public.artists
 add column if not exists last_stats_updated_at timestamptz not null default now();
+
+alter table public.artists
+add column if not exists weekly_follower_growth integer not null default 0;
+
+alter table public.artists
+add column if not exists weekly_post_growth integer not null default 0;
+
+alter table public.artists
+add column if not exists weekly_follower_growth_rate numeric not null default 0;
+
+alter table public.artists
+add column if not exists weekly_post_growth_rate numeric not null default 0;
+
+alter table public.artists
+add column if not exists stats_period_start date;
+
+alter table public.artists
+add column if not exists stats_period_end date;
 
 alter table public.artists
 add column if not exists is_hot boolean not null default false;

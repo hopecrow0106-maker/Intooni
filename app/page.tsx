@@ -30,6 +30,10 @@ type HeroDecoration = {
   driftY: number;
 };
 
+type GrowthMetric = "followers" | "posts";
+type GrowthValueMode = "count" | "rate";
+const GROWTH_BAR_COLORS = ["#ff4d6d", "#49a7c9", "#7c6ee6", "#f0a33a", "#47a878"] as const;
+
 function matchesFollowerRange(value: number, range: FollowerRangeKey) {
   switch (range) {
     case "under10k":
@@ -51,6 +55,41 @@ function formatFollowerCount(value: number) {
   }
 
   return new Intl.NumberFormat("ko-KR").format(value);
+}
+
+function formatGrowthCount(value: number) {
+  return `+${new Intl.NumberFormat("ko-KR").format(Math.max(0, value))}`;
+}
+
+function formatGrowthRate(value: number) {
+  return `+${new Intl.NumberFormat("ko-KR", {
+    maximumFractionDigits: 2
+  }).format(Math.max(0, value))}%`;
+}
+
+function formatPeriodDate(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function getGrowthPeriodLabel(artists: Artist[]) {
+  const artistWithPeriod = artists.find((artist) => artist.stats_period_start && artist.stats_period_end);
+  const start = formatPeriodDate(artistWithPeriod?.stats_period_start);
+  const end = formatPeriodDate(artistWithPeriod?.stats_period_end);
+
+  return start && end ? `집계 기준 ${start} ~ ${end}` : "주간 집계 기준";
 }
 
 function shuffleItems<T>(items: T[]) {
@@ -144,7 +183,7 @@ function SectionBannerAd() {
 function ArtistSkeletonCard() {
   return (
     <div className="overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white">
-      <div className="aspect-square animate-pulse bg-[#f2f0ec]" />
+      <div className="aspect-[4/3] animate-pulse bg-[#f2f0ec]" />
       <div className="space-y-2.5 p-3.5">
         <div className="h-4 w-24 animate-pulse rounded-full bg-[#f2f0ec]" />
         <div className="flex gap-1.5">
@@ -172,7 +211,7 @@ function HorizontalArtistCard({
   return (
     <button type="button" onClick={onClick} className="trending-card text-left">
       {artist.thumbnail_url ? (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={artist.thumbnail_url}
             alt={artist.name}
@@ -189,7 +228,7 @@ function HorizontalArtistCard({
           />
         </div>
       ) : (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={ARTIST_SQUARE_PLACEHOLDER}
             alt={artist.name}
@@ -230,7 +269,7 @@ function NewArtistGridCard({
         {index + 1}
       </span>
       {artist.thumbnail_url ? (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={artist.thumbnail_url}
             alt={artist.name}
@@ -247,7 +286,7 @@ function NewArtistGridCard({
           />
         </div>
       ) : (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={ARTIST_SQUARE_PLACEHOLDER}
             alt={artist.name}
@@ -264,6 +303,198 @@ function NewArtistGridCard({
         </p>
       </div>
     </button>
+  );
+}
+
+function getWeeklyGrowthValue(artist: Artist, metric: GrowthMetric, valueMode: GrowthValueMode) {
+  if (metric === "followers") {
+    return valueMode === "count"
+      ? artist.weekly_follower_growth ?? 0
+      : artist.weekly_follower_growth_rate ?? 0;
+  }
+
+  return valueMode === "count" ? artist.weekly_post_growth ?? 0 : artist.weekly_post_growth_rate ?? 0;
+}
+
+function GrowthChartSection({
+  artists,
+  metric,
+  valueMode,
+  onMetricChange,
+  onValueModeChange,
+  onArtistClick
+}: {
+  artists: Artist[];
+  metric: GrowthMetric;
+  valueMode: GrowthValueMode;
+  onMetricChange: (metric: GrowthMetric) => void;
+  onValueModeChange: (valueMode: GrowthValueMode) => void;
+  onArtistClick: (artist: Artist) => void;
+}) {
+  const maxValue = Math.max(...artists.map((artist) => getWeeklyGrowthValue(artist, metric, valueMode)), 0);
+  const chartMaxValue = valueMode === "rate" ? Math.max(maxValue, 100) : maxValue;
+  const benchmarkPercent = valueMode === "rate" && chartMaxValue > 100 ? (100 / chartMaxValue) * 100 : null;
+  const hasData = artists.length > 0 && maxValue > 0;
+  const title = metric === "followers" ? "팔로워 증가 Top 5" : "게시물 증가 Top 5";
+  const unitLabel = valueMode === "count" ? "증가 수" : "증가율";
+  const periodLabel = getGrowthPeriodLabel(artists);
+
+  return (
+    <section className="mx-auto mb-10 max-w-[980px] px-5 md:px-8">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
+            📈 {title}
+          </h2>
+          <p className="mt-1 text-xs font-medium text-[#8a8a8a]">
+            주간 {unitLabel} 기준 · {periodLabel}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(["followers", "posts"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onMetricChange(item)}
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                metric === item
+                  ? "bg-[#1f2233] text-white"
+                  : "border border-[rgba(0,0,0,0.08)] bg-white text-[#6b6b6b] hover:border-[#ff4d6d] hover:text-[#c9153d]"
+              }`}
+            >
+              {item === "followers" ? "팔로워" : "게시물"}
+            </button>
+          ))}
+          {(["count", "rate"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onValueModeChange(item)}
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                valueMode === item
+                  ? "bg-[#ff4d6d] text-white"
+                  : "border border-[rgba(0,0,0,0.08)] bg-white text-[#6b6b6b] hover:border-[#ff4d6d] hover:text-[#c9153d]"
+              }`}
+            >
+              {item === "count" ? "갯수" : "비율"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-[14px] border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3 sm:px-5 sm:py-4">
+        {!hasData ? (
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[16px] bg-[#f8f7f4] px-5 text-center">
+            <p className="text-sm font-extrabold text-[#1a1a1a]">주간 증가 데이터 연동 대기중</p>
+            <p className="mt-1.5 break-keep text-xs leading-5 text-[#8a8a8a]">
+              팔로워/게시물 증가 수와 증가율이 들어오면 이 영역에 Top 5 차트가 표시됩니다.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {artists.map((artist, index) => {
+              const value = getWeeklyGrowthValue(artist, metric, valueMode);
+              const width = chartMaxValue > 0 ? Math.min(Math.max((value / chartMaxValue) * 100, 2), 100) : 0;
+              const barColor = GROWTH_BAR_COLORS[index % GROWTH_BAR_COLORS.length];
+
+              return (
+                <button
+                  key={artist.id}
+                  type="button"
+                  onClick={() => onArtistClick(artist)}
+                  className="growth-row group grid w-full grid-cols-[32px_minmax(0,1fr)_72px] items-center gap-3 rounded-[10px] px-1.5 py-2 text-left transition hover:bg-[#faf7f3] sm:grid-cols-[32px_150px_minmax(220px,1fr)_86px]"
+                  style={{ "--growth-delay": `${index * 75}ms` } as CSSProperties}
+                >
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold text-white"
+                    style={{ backgroundColor: barColor }}
+                  >
+                    {index + 1}
+                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-[8px] bg-[#f2f0ec]">
+                      <Image
+                        src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
+                        alt={artist.name}
+                        fill
+                        className="object-cover"
+                        sizes="32px"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-extrabold text-[#1a1a1a]">{artist.name}</p>
+                      <p className="truncate text-[11px] font-medium text-[#a0a0a0]">{artist.genre}</p>
+                    </div>
+                  </div>
+                  <div className="relative order-4 col-span-3 h-2.5 rounded-full bg-[#f1eee8] sm:order-none sm:col-span-1">
+                    {benchmarkPercent !== null ? (
+                      <span
+                        className="absolute top-[-3px] h-[18px] w-px bg-[#2d3142]/35"
+                        style={{ left: `${benchmarkPercent}%` }}
+                      />
+                    ) : null}
+                    <div
+                      key={`${metric}-${valueMode}-${artist.id}`}
+                      className="growth-bar-fill h-full rounded-full"
+                      style={
+                        {
+                          "--growth-width": `${width}%`,
+                          "--growth-delay": `${index * 75}ms`,
+                          backgroundColor: barColor
+                        } as CSSProperties
+                      }
+                    />
+                  </div>
+                  <span
+                    key={`${metric}-${valueMode}-${artist.id}-value`}
+                    className="growth-value-pop order-3 text-right text-sm font-extrabold text-[#1f2233] sm:order-none"
+                    style={{ "--growth-delay": `${index * 75 + 120}ms` } as CSSProperties}
+                  >
+                    {valueMode === "count" ? formatGrowthCount(value) : formatGrowthRate(value)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function NewArtistsSection({
+  artists,
+  onArtistClick
+}: {
+  artists: Artist[];
+  onArtistClick: (artist: Artist) => void;
+}) {
+  if (artists.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
+          ✨ 새로운 인투니들!
+        </h2>
+      </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {artists.map((artist, index) => (
+            <div
+              key={artist.id}
+              className="min-w-0"
+            >
+              <ArtistCard
+                artist={artist}
+                index={index}
+                onClick={() => onArtistClick(artist)}
+              />
+            </div>
+          ))}
+      </div>
+    </section>
   );
 }
 
@@ -292,6 +523,8 @@ export default function HomePage() {
   const [randomRollingName, setRandomRollingName] = useState("");
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [typedInquiryText, setTypedInquiryText] = useState("");
+  const [growthMetric, setGrowthMetric] = useState<GrowthMetric>("followers");
+  const [growthValueMode, setGrowthValueMode] = useState<GrowthValueMode>("count");
   const hasMoreArtists = false;
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastLoggedSearchRef = useRef("");
@@ -543,14 +776,22 @@ export default function HomePage() {
       ),
     [allArtists]
   );
-  const featuredNewProfileArtists = useMemo(
-    () => featuredNewArtists.filter((artist) => artist.thumbnail_url),
-    [featuredNewArtists]
-  );
-  const featuredNewEmbedArtists = useMemo(
-    () => featuredNewArtists.filter((artist) => !artist.thumbnail_url && getFallbackInstagramUrl(artist)),
-    [featuredNewArtists]
-  );
+  const featuredWeeklyGrowthArtists = useMemo(() => {
+    const sortedByGrowth = [...allArtists].sort((a, b) => {
+      const aGrowth = getWeeklyGrowthValue(a, growthMetric, growthValueMode);
+      const bGrowth = getWeeklyGrowthValue(b, growthMetric, growthValueMode);
+
+      if (aGrowth !== bGrowth) {
+        return bGrowth - aGrowth;
+      }
+
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return sortedByGrowth
+      .filter((artist) => getWeeklyGrowthValue(artist, growthMetric, growthValueMode) > 0)
+      .slice(0, 5);
+  }, [allArtists, growthMetric, growthValueMode]);
   const featuredHotProfileArtists = useMemo(
     () => featuredHotArtists.filter((artist) => artist.thumbnail_url),
     [featuredHotArtists]
@@ -892,48 +1133,23 @@ export default function HomePage() {
             />
           </section>
 
-          <div className="mx-auto mb-4 max-w-[1200px] px-5 md:px-8">
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setShowInquiryModal(true)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setShowInquiryModal(true);
-                }
-              }}
-              className="flex w-full cursor-pointer items-center gap-5 rounded-[20px] px-6 py-5 text-white transition hover:scale-[1.01]"
-              style={{ background: "linear-gradient(135deg, #FF4D6D 0%, #FF8C69 100%)" }}
-            >
-              <span className="shrink-0 text-4xl">📣</span>
-              <div className="min-w-0 text-left">
-                <h3 className="mb-0.5 break-keep text-[17px] font-extrabold tracking-[-0.02em]">
-                  인스타툰 작가신가요?
-                </h3>
-                <p className="break-keep text-sm leading-snug opacity-80">
-                  인투니에 등록하면 광고주·브랜드가 먼저 연락해와요
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mx-auto mb-10 max-w-[1200px] px-5 md:px-8">
+          <div className="mx-auto mb-8 max-w-[1200px] px-5 md:px-8">
             <a
               href="https://forms.gle/1urGhUvYyJfGjY2H7"
               target="_blank"
               rel="noreferrer"
-              className="flex w-full items-center gap-5 rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white px-6 py-5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)]"
+              className="flex w-full items-center gap-3 rounded-[16px] border border-[#ffd3dc] bg-[#fff7f8] px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(255,77,109,0.12)] sm:px-5"
             >
-              <span className="shrink-0 text-4xl">📝</span>
-              <div className="min-w-0 flex-1 text-left">
-                <h3 className="mb-0.5 break-keep text-[17px] font-extrabold leading-tight tracking-[-0.02em] text-[#1a1a1a]">
-                  <span className="block sm:inline">인투니 작가</span>{" "}
-                  <span className="block sm:inline">등록 신청</span>
-                </h3>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff4d6d] text-base text-white">
+                📝
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="break-keep text-sm font-extrabold tracking-[-0.02em] text-[#1a1a1a]">
+                  인스타툰 작가라면, 인투니 등록 신청
+                </p>
               </div>
-              <span className="rounded-full bg-[#fff0f3] px-4 py-2 text-sm font-semibold text-[#c9153d]">
-                신청하러 가기 →
+              <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#c9153d]">
+                신청 →
               </span>
             </a>
           </div>
@@ -1014,38 +1230,22 @@ export default function HomePage() {
             </section>
           ) : null}
 
-          {!isSearching && featuredNewArtists.length > 0 ? (
-            <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
-              <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
-                  ✨ 새로운 인투니들!
-                </h2>
-              </div>
-              {featuredNewProfileArtists.length > 0 ? (
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                  {featuredNewProfileArtists.map((artist, index) => (
-                    <NewArtistGridCard
-                      key={artist.id}
-                      artist={artist}
-                      index={index}
-                      onClick={() => openArtistModal(artist, "profile_click")}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              {featuredNewEmbedArtists.length > 0 ? (
-                <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {featuredNewEmbedArtists.map((artist, index) => (
-                    <NewArtistGridCard
-                      key={artist.id}
-                      artist={artist}
-                      index={featuredNewProfileArtists.length + index}
-                      onClick={() => openArtistModal(artist, "profile_click")}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </section>
+          {!isSearching ? (
+            <GrowthChartSection
+              artists={featuredWeeklyGrowthArtists}
+              metric={growthMetric}
+              valueMode={growthValueMode}
+              onMetricChange={setGrowthMetric}
+              onValueModeChange={setGrowthValueMode}
+              onArtistClick={(artist) => openArtistModal(artist, "profile_click")}
+            />
+          ) : null}
+
+          {!isSearching ? (
+            <NewArtistsSection
+              artists={featuredNewArtists}
+              onArtistClick={(artist) => openArtistModal(artist, "profile_click")}
+            />
           ) : null}
 
           {!isSearching && featuredNewArtists.length > 0 ? <SectionBannerAd /> : null}

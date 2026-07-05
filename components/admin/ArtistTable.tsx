@@ -95,6 +95,18 @@ function getPeriodLabel(period: ArtistStatsPeriod) {
   }
 }
 
+function getStatsTotal(stats: ArtistStatsSummary) {
+  return (
+    stats.profile_click +
+    stats.instagram_click +
+    stats.embed_click +
+    stats.hero_click +
+    stats.toonbti_result_click +
+    stats.toonbti_character_click +
+    stats.random_click
+  );
+}
+
 function ToggleRow({
   label,
   active,
@@ -110,7 +122,7 @@ function ToggleRow({
       <button
         type="button"
         onClick={onClick}
-        className={`switch-track ${active ? "bg-coral" : "bg-slate-300"}`}
+        className={`switch-track ${active ? "bg-slate-900" : "bg-slate-300"}`}
       >
         <span className={`switch-thumb ${active ? "translate-x-6" : "translate-x-1"}`} />
       </button>
@@ -169,6 +181,7 @@ export function ArtistTable({
                 artist_id: artist.id,
                 ...EMPTY_ARTIST_STATS
               };
+              const statsTotal = getStatsTotal(stats);
 
               return (
                 <Draggable
@@ -181,12 +194,12 @@ export function ArtistTable({
                     <div
                       ref={dragProvided.innerRef}
                       {...dragProvided.draggableProps}
-                      className="panel-surface flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between"
+                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4"
                     >
                       <div className="flex items-start gap-4">
                         <div
                           {...dragProvided.dragHandleProps}
-                          className={`relative h-16 w-16 overflow-hidden rounded-2xl bg-slate-100 ${
+                          className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ${
                             reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""
                           }`}
                           title={reorderEnabled ? "드래그해서 순서 변경" : "최신순 페이지 목록"}
@@ -209,63 +222,48 @@ export function ArtistTable({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">
+                            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-slate-500">
                               통계 업데이트 {formatUpdatedDate(artist.last_stats_updated_at)}
                             </span>
                             {isStale(artist.last_stats_updated_at) ? (
-                              <span className="rounded-full bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
+                              <span className="rounded-md bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
                                 업데이트 필요
                               </span>
                             ) : null}
                             {artist.hide_from_new ? (
-                              <span className="rounded-full bg-slate-200 px-2.5 py-1 font-semibold text-slate-600">
+                              <span className="rounded-md bg-slate-200 px-2.5 py-1 font-semibold text-slate-600">
                                 NEW 제외
                               </span>
                             ) : null}
                             {isToonbtiDataMissing(artist) ? (
-                              <span className="rounded-full bg-red-100 px-2.5 py-1 font-semibold text-red-600">
+                              <span className="rounded-md bg-red-100 px-2.5 py-1 font-semibold text-red-600">
                                 툰비티아이 데이터 누락!
                               </span>
                             ) : null}
                             {isHiddenTagsMissing(artist) ? (
-                              <span className="rounded-full bg-orange-100 px-2.5 py-1 font-semibold text-orange-700">
+                              <span className="rounded-md bg-orange-100 px-2.5 py-1 font-semibold text-orange-700">
                                 숨김태그 누락!
                               </span>
                             ) : null}
                             {isCharacterImageMissing(artist) ? (
-                              <span className="rounded-full bg-sky-100 px-2.5 py-1 font-semibold text-sky-700">
+                              <span className="rounded-md bg-sky-100 px-2.5 py-1 font-semibold text-sky-700">
                                 누끼 PNG 누락!
                               </span>
                             ) : null}
                           </div>
 
                           <div className="flex flex-wrap gap-2 text-xs">
-                            <span className="rounded-full bg-[#f4f0ff] px-2.5 py-1 text-[#5a43d6]">
-                              {getPeriodLabel(statsPeriod)} 클릭 {stats.profile_click}
+                            <span className="rounded-md bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
+                              {getPeriodLabel(statsPeriod)} 총 반응 {statsTotal}
                             </span>
-                            <span className="rounded-full bg-[#fff0f3] px-2.5 py-1 text-[#c9153d]">
-                              인스타 이동 {stats.instagram_click}
-                            </span>
-                            <span className="rounded-full bg-[#eef7ff] px-2.5 py-1 text-[#2b6cb0]">
-                              임베드 이동 {stats.embed_click}
-                            </span>
-                            <span className="rounded-full bg-[#fff8e1] px-2.5 py-1 text-[#946200]">
-                              홈 캐릭터 {stats.hero_click}
-                            </span>
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
-                              툰비티아이 결과 {stats.toonbti_result_click}
-                            </span>
-                            <span className="rounded-full bg-violet-50 px-2.5 py-1 text-violet-700">
-                              툰비티아이 캐릭터 {stats.toonbti_character_click}
-                            </span>
-                            <span className="rounded-full bg-sky-50 px-2.5 py-1 text-sky-700">
-                              랜덤 추천 {stats.random_click}
+                            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-slate-500">
+                              상세 통계는 수정/정보에서 확인
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
                         <ToggleRow label="광고" active={artist.is_ad} onClick={() => onToggleAd(artist)} />
                         <ToggleRow
                           label="요즘 뜨는 작가"
@@ -275,21 +273,21 @@ export function ArtistTable({
                         <button
                           type="button"
                           onClick={() => openInstagramProfile(artist.instagram_handle)}
-                          className="rounded-full border border-[#ffd0d9] bg-[#fff5f7] px-4 py-2 text-sm font-semibold text-[#c9153d] transition hover:border-[#ff8ea5] hover:bg-[#fff0f3]"
+                          className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-ink"
                         >
                           인스타 열기
                         </button>
                         <button
                           type="button"
                           onClick={() => onEdit(artist)}
-                          className="rounded-full border border-ink px-4 py-2 text-sm font-semibold text-ink transition hover:bg-ink hover:text-white"
+                          className="rounded-lg border border-ink px-3.5 py-2 text-sm font-semibold text-ink transition hover:bg-ink hover:text-white"
                         >
-                          수정
+                          수정/정보
                         </button>
                         <button
                           type="button"
                           onClick={() => onDelete(artist)}
-                          className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-50"
+                          className="rounded-lg border border-red-200 px-3.5 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-50"
                         >
                           삭제
                         </button>

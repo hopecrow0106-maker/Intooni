@@ -41,7 +41,7 @@ export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
       ) : null}
 
       {artist.thumbnail_url ? (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={artist.thumbnail_url}
             alt={artist.name}
@@ -58,7 +58,7 @@ export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
           />
         </div>
       ) : (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={ARTIST_SQUARE_PLACEHOLDER}
             alt={artist.name}
