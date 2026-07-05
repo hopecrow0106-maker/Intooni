@@ -1138,13 +1138,13 @@ export default function HomePage() {
               href="https://forms.gle/1urGhUvYyJfGjY2H7"
               target="_blank"
               rel="noreferrer"
-              className="flex w-full items-center gap-3 rounded-[16px] border border-[#ffd3dc] bg-[#fff7f8] px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-[0_10px_22px_rgba(255,77,109,0.12)] sm:px-5"
+              className="flex w-full items-center gap-3 rounded-[16px] bg-[#ff4d6d] px-4 py-3 text-white shadow-[0_10px_24px_rgba(255,77,109,0.18)] transition hover:-translate-y-0.5 hover:bg-[#e83a5a] sm:px-5"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#ff4d6d] text-base text-white">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-base text-[#ff4d6d]">
                 📝
               </span>
               <div className="min-w-0 flex-1">
-                <p className="break-keep text-sm font-extrabold tracking-[-0.02em] text-[#1a1a1a]">
+                <p className="break-keep text-sm font-extrabold tracking-[-0.02em] text-white">
                   인스타툰 작가라면, 인투니 등록 신청
                 </p>
               </div>
