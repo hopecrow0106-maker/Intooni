@@ -31,7 +31,7 @@ export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
 
   return (
     <article
-      className="group relative flex h-full w-full animate-fade-up flex-col overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.08)] bg-white text-left opacity-0 transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(0,0,0,0.15)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
+      className="group relative w-full animate-fade-up overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white text-left opacity-0 transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(0,0,0,0.15)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
       style={{ animationDelay: `${index * 55}ms`, animationFillMode: "forwards" }}
     >
       <button
@@ -52,7 +52,7 @@ export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
         <span aria-hidden="true" className="text-lg leading-none">↗</span>
       </TrackedArtistActionLink>
       {artist.thumbnail_url ? (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={artist.thumbnail_url}
             alt={artist.name}
@@ -62,13 +62,14 @@ export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
           />
         </div>
       ) : fallbackInstagramUrl ? (
-        <div className="relative aspect-square overflow-hidden bg-white">
-          <div className="pointer-events-none absolute inset-x-0 top-0">
-            <InstagramEmbed url={fallbackInstagramUrl} className="min-h-[420px] border-0" />
-          </div>
+        <div className="bg-white p-2">
+          <InstagramEmbed
+            url={fallbackInstagramUrl}
+            className="min-h-[220px] rounded-[16px] border border-[rgba(0,0,0,0.08)]"
+          />
         </div>
       ) : (
-        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
             src={ARTIST_SQUARE_PLACEHOLDER}
             alt={artist.name}
@@ -79,40 +80,31 @@ export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
         </div>
       )}
 
-      <div className="flex flex-1 flex-col px-3.5 pb-4 pt-3.5 sm:px-4 sm:pt-4">
-        <div className="grid min-h-[42px] grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-          <h3
-            className="line-clamp-2 text-[14px] font-bold leading-[1.4] text-[#1a1a1a] sm:text-[15px]"
-            title={artist.name}
-          >
-            {artist.name}
-          </h3>
-          <span
-            className="max-w-[54px] truncate pt-0.5 text-[11px] font-medium text-[#8a8a8a] sm:max-w-[72px] sm:text-xs"
-            title={artist.genre}
-          >
-            {artist.genre}
-          </span>
+      <div className="space-y-2 px-3.5 pb-4 pt-3">
+        <div>
+          <div className="mb-1 flex items-start justify-between gap-2">
+            <h3 className="text-[14px] font-bold leading-tight tracking-[-0.02em] text-[#1a1a1a]">
+              {artist.name}
+            </h3>
+            <span className="shrink-0 text-[11px] font-medium text-[#a0a0a0]">{artist.genre}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {artist.hashtags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-[#efebff] px-2.5 py-0.5 text-[11px] font-semibold text-[#5a43d6]"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-2 flex h-[48px] content-start flex-wrap gap-1.5 overflow-hidden">
-          {artist.hashtags.slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="h-6 max-w-full truncate rounded-full bg-[#efebff] px-2.5 py-1 text-[11px] font-semibold leading-4 text-[#5a43d6]"
-              title={tag}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-auto flex min-h-9 items-center gap-3 border-t border-black/[0.06] pt-3 text-[11px] font-medium text-[#77738f] sm:text-xs">
-          <span className="inline-flex min-w-0 items-center gap-1 truncate">
+        <div className="flex gap-3 text-[11px] font-medium text-[#8f87c8]">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#f4f0ff] px-2.5 py-1">
             👥 {formatSocialCount(artist.followers)}
           </span>
-          <span aria-hidden="true" className="h-3.5 w-px bg-black/10" />
-          <span className="inline-flex min-w-0 items-center gap-1 truncate">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#f7f3ff] px-2.5 py-1 text-[#a39abf]">
             📚 {formatSocialCount(artist.post_count)}
           </span>
         </div>

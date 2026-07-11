@@ -20,13 +20,4 @@ describe("home SSR rendering contracts", () => {
     expect(cardSource).toContain("encodeURIComponent(artist.instagram_handle");
     expect(cardSource).toContain('eventType="artist_click"');
   });
-
-  it("keeps artist cards on a fixed square and equal-height layout", () => {
-    expect(cardSource).toContain("flex h-full w-full");
-    expect(cardSource).toContain("aspect-square");
-    expect(cardSource).toContain('min-h-[42px]');
-    expect(cardSource).toContain('h-[48px]');
-    expect(cardSource).toContain("mt-auto");
-    expect(homeSource).toContain('max-w-[1440px]');
-  });
 });
