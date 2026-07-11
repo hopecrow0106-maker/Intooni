@@ -147,10 +147,7 @@ function getGrowthPeriodLabel(artists: Artist[]) {
   const start = formatPeriodDate(artistWithPeriod?.stats_period_start);
   const end = formatPeriodDate(artistWithPeriod?.stats_period_end);
 
-  if (!start || !end) return "주간 비교 데이터 부족";
-  if (artistWithPeriod?.is_weekly_comparable === false) {
-    return `주간 비교 데이터 부족 · ${start} ~ ${end}`;
-  }
+  if (!start || !end) return "비교 데이터 부족";
   return `집계 기준 ${start} ~ ${end}`;
 }
 
@@ -264,15 +261,17 @@ function SectionBannerAd() {
 
 function ArtistSkeletonCard() {
   return (
-    <div className="overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white">
-      <div className="aspect-[4/3] animate-pulse bg-[#f2f0ec]" />
-      <div className="space-y-2.5 p-3.5">
-        <div className="h-4 w-24 animate-pulse rounded-full bg-[#f2f0ec]" />
-        <div className="flex gap-1.5">
+    <div className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white">
+      <div className="aspect-square animate-pulse bg-[#f2f0ec]" />
+      <div className="flex flex-1 flex-col p-3.5">
+        <div className="h-[40px]">
+          <div className="h-4 w-24 animate-pulse rounded-full bg-[#f2f0ec]" />
+        </div>
+        <div className="flex h-[48px] gap-1.5">
           <div className="h-5 w-14 animate-pulse rounded-full bg-[#f2f0ec]" />
           <div className="h-5 w-14 animate-pulse rounded-full bg-[#f2f0ec]" />
         </div>
-        <div className="flex gap-3">
+        <div className="mt-auto flex min-h-[28px] items-end gap-3">
           <div className="h-3.5 w-14 animate-pulse rounded-full bg-[#f2f0ec]" />
           <div className="h-3.5 w-12 animate-pulse rounded-full bg-[#f2f0ec]" />
         </div>
@@ -429,7 +428,7 @@ function GrowthChartSection({
             📈 {title}
           </h2>
           <p className="mt-1 text-xs font-medium text-[#8a8a8a]">
-            주간 {unitLabel} 기준 · {periodLabel}
+            기간 {unitLabel} 기준 · {periodLabel}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -458,7 +457,7 @@ function GrowthChartSection({
                   : "border border-[rgba(0,0,0,0.08)] bg-white text-[#6b6b6b] hover:border-[#ff4d6d] hover:text-[#c9153d]"
               }`}
             >
-              {item === "count" ? "갯수" : "비율"}
+              {item === "count" ? "증가 수" : "비율"}
             </button>
           ))}
         </div>
@@ -467,7 +466,7 @@ function GrowthChartSection({
       <div className="rounded-[14px] border border-[rgba(0,0,0,0.08)] bg-white px-4 py-3 sm:px-5 sm:py-4">
         {!hasData ? (
           <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[16px] bg-[#f8f7f4] px-5 text-center">
-            <p className="text-sm font-extrabold text-[#1a1a1a]">주간 증가 데이터 연동 대기중</p>
+            <p className="text-sm font-extrabold text-[#1a1a1a]">기간 증가 데이터 연동 대기중</p>
             <p className="mt-1.5 break-keep text-xs leading-5 text-[#8a8a8a]">
               팔로워/게시물 증가 수와 증가율이 들어오면 이 영역에 Top 5 차트가 표시됩니다.
             </p>
@@ -556,7 +555,7 @@ function NewArtistsSection({
   }
 
   return (
-    <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
+    <section className="mx-auto mb-12 max-w-[1440px] px-5 md:px-8">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
           ✨ 새로운 인투니들!
@@ -572,6 +571,7 @@ function NewArtistsSection({
                 artist={artist}
                 index={index}
                 onClick={() => onArtistClick(artist)}
+                uniformHeight={false}
               />
             </div>
           ))}
@@ -699,7 +699,8 @@ export default function HomeClient({
       }
 
       setCategories(categoriesResponse);
-      const nextArtists = (artistsResponse.artists ?? []).map(publicArtistToHomeArtist);
+      const fetchedArtists = (artistsResponse.artists ?? []).map(publicArtistToHomeArtist);
+      const nextArtists = fetchedArtists.length > 0 ? fetchedArtists : initialHomeArtists;
       const counts = nextArtists.reduce<Record<string, number>>((acc, artist) => {
         acc[artist.genre] = (acc[artist.genre] ?? 0) + 1;
         return acc;
@@ -723,7 +724,7 @@ export default function HomeClient({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [initialHomeArtists]);
 
   useEffect(() => {
     if (!showInquiryModal) {
@@ -1038,7 +1039,7 @@ export default function HomeClient({
               <button
                 type="button"
                 onClick={() => openArtistModal(heroDecorations[1].artist)}
-                className="absolute left-0 top-3 z-10 hidden md:block"
+                className="absolute left-0 top-3 z-30 hidden cursor-pointer md:block"
                 style={
                   {
                     animation: `hero-drift ${heroDecorations[1].duration}s ease-in-out infinite`,
@@ -1055,7 +1056,7 @@ export default function HomeClient({
                   alt={`${heroDecorations[1].artist.name} 캐릭터`}
                   width={130}
                   height={130}
-                  className="h-[90px] w-[90px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.13)] md:h-[110px] md:w-[110px] lg:h-[130px] lg:w-[130px]"
+                  className="pointer-events-none h-[90px] w-[90px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.13)] md:h-[110px] md:w-[110px] lg:h-[130px] lg:w-[130px]"
                 />
               </button>
             )}
@@ -1065,7 +1066,7 @@ export default function HomeClient({
               <button
                 type="button"
                 onClick={() => openArtistModal(heroDecorations[0].artist)}
-                className="absolute bottom-2 z-10"
+                className="absolute bottom-2 z-30 cursor-pointer"
                 style={
                   {
                     left: "8%",
@@ -1083,7 +1084,7 @@ export default function HomeClient({
                   alt={`${heroDecorations[0].artist.name} 캐릭터`}
                   width={195}
                   height={195}
-                  className="h-[120px] w-[120px] object-contain drop-shadow-[0_16px_26px_rgba(0,0,0,0.15)] md:h-[160px] md:w-[160px] lg:h-[195px] lg:w-[195px]"
+                  className="pointer-events-none h-[120px] w-[120px] object-contain drop-shadow-[0_16px_26px_rgba(0,0,0,0.15)] md:h-[160px] md:w-[160px] lg:h-[195px] lg:w-[195px]"
                 />
               </button>
             )}
@@ -1093,7 +1094,7 @@ export default function HomeClient({
               <button
                 type="button"
                 onClick={() => openArtistModal(heroDecorations[2].artist)}
-                className="absolute top-3 z-10"
+                className="absolute top-3 z-30 cursor-pointer"
                 style={
                   {
                     right: "8%",
@@ -1111,7 +1112,7 @@ export default function HomeClient({
                   alt={`${heroDecorations[2].artist.name} 캐릭터`}
                   width={205}
                   height={205}
-                  className="h-[130px] w-[130px] object-contain drop-shadow-[0_16px_26px_rgba(0,0,0,0.15)] md:h-[165px] md:w-[165px] lg:h-[205px] lg:w-[205px]"
+                  className="pointer-events-none h-[130px] w-[130px] object-contain drop-shadow-[0_16px_26px_rgba(0,0,0,0.15)] md:h-[165px] md:w-[165px] lg:h-[205px] lg:w-[205px]"
                 />
               </button>
             )}
@@ -1121,7 +1122,7 @@ export default function HomeClient({
               <button
                 type="button"
                 onClick={() => openArtistModal(heroDecorations[3].artist)}
-                className="absolute bottom-3 right-0 z-10 hidden md:block"
+                className="absolute bottom-3 right-0 z-30 hidden cursor-pointer md:block"
                 style={
                   {
                     animation: `hero-drift ${heroDecorations[3].duration}s ease-in-out infinite`,
@@ -1138,7 +1139,7 @@ export default function HomeClient({
                   alt={`${heroDecorations[3].artist.name} 캐릭터`}
                   width={120}
                   height={120}
-                  className="h-[85px] w-[85px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.13)] md:h-[100px] md:w-[100px] lg:h-[120px] lg:w-[120px]"
+                  className="pointer-events-none h-[85px] w-[85px] object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.13)] md:h-[100px] md:w-[100px] lg:h-[120px] lg:w-[120px]"
                 />
               </button>
             )}
@@ -1312,7 +1313,7 @@ export default function HomeClient({
 
           {!isSearching && featuredNewArtists.length > 0 ? <SectionBannerAd /> : null}
 
-          <section ref={searchResultsRef} className="mx-auto max-w-[1200px] px-5 pb-20 md:px-8">
+          <section ref={searchResultsRef} className="mx-auto max-w-[1440px] px-5 pb-20 md:px-8">
             <div className="mb-5 flex items-baseline justify-between">
               <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
                 {gridTitle}

@@ -94,29 +94,44 @@ function assertPublicPayload(payload: unknown) {
 async function getStatsByArtistId(artistIds: string[]) {
   const uniqueArtistIds = Array.from(new Set(artistIds)).filter(Boolean);
   const statsByArtistId = new Map<string, ArtistStatQueryRow[]>();
+  const pageSize = 1000;
 
   if (uniqueArtistIds.length === 0) {
     return statsByArtistId;
   }
 
   const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("artist_stats" as never)
-    .select("artist_id, recorded_date, followers, post_count")
-    .in("artist_id", uniqueArtistIds)
-    .order("recorded_date", { ascending: false })
-    .limit(Math.max(uniqueArtistIds.length * 2, 100));
+  let from = 0;
 
-  if (error) {
-    return statsByArtistId;
-  }
+  while (true) {
+    const { data, error } = await supabase
+      .from("artist_stats" as never)
+      .select("artist_id, recorded_date, followers, post_count")
+      .in("artist_id", uniqueArtistIds)
+      .order("recorded_date", { ascending: false })
+      .range(from, from + pageSize - 1);
 
-  for (const row of (data ?? []) as unknown as ArtistStatQueryRow[]) {
-    const current = statsByArtistId.get(row.artist_id) ?? [];
-    if (current.length < 2) {
-      current.push(row);
-      statsByArtistId.set(row.artist_id, current);
+    if (error) {
+      console.error("Public artist_stats query failed", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      return new Map<string, ArtistStatQueryRow[]>();
     }
+
+    const rows = (data ?? []) as unknown as ArtistStatQueryRow[];
+    for (const row of rows) {
+      const current = statsByArtistId.get(row.artist_id) ?? [];
+      if (current.length < 2) {
+        current.push(row);
+        statsByArtistId.set(row.artist_id, current);
+      }
+    }
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
   }
 
   return statsByArtistId;

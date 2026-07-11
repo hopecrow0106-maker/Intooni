@@ -1,5 +1,7 @@
 # Intooni
 
+데이터 구조와 운영 흐름을 처음부터 학습하려면 [인투니 데이터베이스와 Google Sheets 학습 가이드](docs/README_DATABASE_AND_SHEETS.md)를 먼저 읽으세요.
+
 Intooni는 인스타툰 작가를 장르, 해시태그, 팔로워 기준으로 탐색하고, 어드민 화면에서 작가 데이터를 관리할 수 있는 Next.js 14 프로젝트입니다.
 
 ## Stack

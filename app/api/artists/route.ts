@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getErrorMessage } from "@/lib/api-error";
@@ -11,6 +12,16 @@ import type { Artist } from "@/lib/types";
 
 function unauthorizedResponse() {
   return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+}
+
+function revalidatePublicArtistViews(handle?: string | null) {
+  revalidatePath("/");
+  revalidatePath("/sitemap.xml");
+
+  const normalizedHandle = handle?.replace(/^@/, "").trim();
+  if (normalizedHandle) {
+    revalidatePath(`/artists/${encodeURIComponent(normalizedHandle)}`);
+  }
 }
 
 function isMissingColumnError(error: unknown, columnName: string) {
@@ -253,6 +264,7 @@ export async function POST(request: Request) {
       throw error;
     }
 
+    revalidatePublicArtistViews((data as { instagram_handle?: string } | null)?.instagram_handle);
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     return NextResponse.json(
@@ -284,6 +296,7 @@ export async function PUT(request: Request) {
         throw failed.error;
       }
 
+      revalidatePublicArtistViews();
       return NextResponse.json({ success: true });
     }
 
@@ -335,6 +348,7 @@ export async function PUT(request: Request) {
       await removeStorageFile(existingArtist.character_url);
     }
 
+    revalidatePublicArtistViews((data as { instagram_handle?: string } | null)?.instagram_handle);
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
@@ -378,6 +392,7 @@ export async function DELETE(request: Request) {
       );
     }
 
+    revalidatePublicArtistViews();
     return NextResponse.json({ success: true, archived: true });
   } catch (error) {
     return NextResponse.json(

@@ -22,6 +22,7 @@ type QueryMock = {
   in: ReturnType<typeof vi.fn>;
   order: ReturnType<typeof vi.fn>;
   limit: ReturnType<typeof vi.fn>;
+  range: ReturnType<typeof vi.fn>;
   maybeSingle: ReturnType<typeof vi.fn>;
 };
 
@@ -59,6 +60,7 @@ function createQueryMock(table: string, data: unknown): QueryMock {
     in: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
+    range: vi.fn(() => query),
     maybeSingle: vi.fn(() => Promise.resolve({ data, error: null }))
   };
 
@@ -126,6 +128,7 @@ describe("public artist server queries", () => {
     expect(artistQuery.order).toHaveBeenCalledWith("sort_order", { ascending: true });
     expect(statsQuery.select).toHaveBeenCalledWith("artist_id, recorded_date, followers, post_count");
     expect(statsQuery.in).toHaveBeenCalledWith("artist_id", ["artist-1"]);
+    expect(statsQuery.range).toHaveBeenCalledWith(0, 999);
   });
 
   it("normalizes detail handles and keeps private artists out of the detail query", async () => {

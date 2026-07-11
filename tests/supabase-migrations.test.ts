@@ -14,7 +14,10 @@ const migrationFiles = {
   removeAd: "202607110004_remove_artist_ad_feature.sql",
   toonRouteMap: "202607110005_toon_test_route_map.sql",
   cleanup: "202607110006_verified_legacy_cleanup.sql",
-  collaborationContent: "202607110007_add_collaboration_content_summary.sql"
+  collaborationContent: "202607110007_add_collaboration_content_summary.sql",
+  legacyGrowthBaseline: "202607110008_backfill_legacy_growth_baseline.sql",
+  schemaHousekeeping: "202607110009_schema_housekeeping.sql",
+  domainClassification: "202607110010_domain_classification.sql"
 } as const;
 
 function readMigration(fileName: string) {
@@ -37,7 +40,10 @@ describe("Supabase refactor migrations", () => {
       migrationFiles.removeAd,
       migrationFiles.toonRouteMap,
       migrationFiles.cleanup,
-      migrationFiles.collaborationContent
+      migrationFiles.collaborationContent,
+      migrationFiles.legacyGrowthBaseline,
+      migrationFiles.schemaHousekeeping,
+      migrationFiles.domainClassification
     ]);
   });
 
@@ -149,6 +155,42 @@ describe("Supabase refactor migrations", () => {
     );
     expect(sql).toContain("else 'artist_click'");
     expect(sql).not.toMatch(/\b(drop\s+column|drop\s+table|truncate)\b/);
+  });
+
+  it("restores the preserved legacy growth baseline as an idempotent snapshot", () => {
+    const sql = normalizeSql(readMigration(migrationFiles.legacyGrowthBaseline));
+
+    expect(sql).toContain("from public.migration_legacy_backup");
+    expect(sql).toContain("weekly_follower_growth");
+    expect(sql).toContain("weekly_post_growth");
+    expect(sql).toContain("insert into public.artist_stats");
+    expect(sql).toContain("on conflict (artist_id, recorded_date) do nothing");
+    expect(sql).not.toMatch(/\b(drop|truncate|delete)\b/);
+  });
+
+  it("adds query indexes and descriptions without changing stored rows", () => {
+    const sql = normalizeSql(readMigration(migrationFiles.schemaHousekeeping));
+
+    expect(sql).toContain("create index if not exists artist_stats_recorded_date_idx");
+    expect(sql).toContain("create index if not exists artist_collaborations_artist_date_idx");
+    expect(sql).toContain("create index if not exists sheet_sync_jobs_status_created_idx");
+    expect(sql).toContain("comment on table public.magazine_artists");
+    expect(sql).not.toMatch(/\b(insert|update|delete|drop|truncate)\b/);
+  });
+
+  it("classifies every target table through metadata without moving data", () => {
+    const sql = normalizeSql(readMigration(migrationFiles.domainClassification));
+
+    for (const domain of ["core", "business", "editorial", "toonbti", "analytics", "ops"]) {
+      expect(sql).toContain(`'[${domain}]`);
+    }
+    expect(sql).toContain("comment on table public.artists");
+    expect(sql).toContain("comment on table public.artist_collaborations");
+    expect(sql).toContain("comment on table public.magazine_artists");
+    expect(sql).toContain("comment on table public.toon_tests");
+    expect(sql).toContain("comment on table public.artist_event_logs");
+    expect(sql).toContain("comment on table public.sheet_sync_jobs");
+    expect(sql).not.toMatch(/\b(insert|update|delete|drop|truncate|alter\s+table|create\s+table)\b/);
   });
 
   it("removes paid artist promotion ranking without deleting the rollback column", () => {

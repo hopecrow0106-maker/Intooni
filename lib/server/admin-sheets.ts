@@ -28,6 +28,7 @@ import {
 } from "@/lib/sheets/artist-sheet";
 import {
   clearSheetRange,
+  ensureSheetTabs,
   ensureGoogleSheetsEnabled,
   getGoogleSheetsSpreadsheetId,
   getSheetValues,
@@ -210,17 +211,22 @@ async function readCategoriesForExport() {
 async function readStatsForExport() {
   try {
     const supabase = getSupabaseAdminClient() as any;
-    const { data, error } = await supabase
-      .from("artist_stats")
-      .select("artist_id, recorded_date, followers, post_count")
-      .order("recorded_date", { ascending: false })
-      .limit(5000);
+    const rows: any[] = [];
+    const pageSize = 1000;
 
-    if (error) {
-      return [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from("artist_stats")
+        .select("artist_id, recorded_date, followers, post_count")
+        .order("recorded_date", { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) return [];
+      rows.push(...(data ?? []));
+      if ((data ?? []).length < pageSize) break;
     }
 
-    return data ?? [];
+    return rows;
   } catch {
     return [];
   }
@@ -375,6 +381,40 @@ function artistCollaborationExportRow(row: any) {
   ].map(toCellValue);
 }
 
+function buildMetricHistoryValues({
+  artists,
+  stats,
+  metric
+}: {
+  artists: any[];
+  stats: any[];
+  metric: "followers" | "post_count";
+}) {
+  const dates = Array.from(
+    new Set(stats.map((row) => String(row.recorded_date ?? "")).filter(Boolean))
+  ).sort();
+  const valuesByArtist = new Map<string, Map<string, number>>();
+
+  for (const stat of stats) {
+    const artistValues = valuesByArtist.get(stat.artist_id) ?? new Map<string, number>();
+    artistValues.set(String(stat.recorded_date), Number(stat[metric] ?? 0));
+    valuesByArtist.set(stat.artist_id, artistValues);
+  }
+
+  return [
+    ["artist_id", "name", "instagram_handle", ...dates],
+    ...artists.map((artist) => {
+      const artistValues = valuesByArtist.get(artist.id);
+      return [
+        artist.id,
+        artist.name,
+        artist.instagram_handle,
+        ...dates.map((date) => artistValues?.get(date) ?? "")
+      ];
+    })
+  ];
+}
+
 export async function exportAdminSheets() {
   ensureGoogleSheetsEnabled();
   const spreadsheetId = getGoogleSheetsSpreadsheetId();
@@ -403,6 +443,8 @@ export async function exportAdminSheets() {
   ];
   const artistsValues = [[...ARTISTS_SHEET_HEADERS], ...artists.map(artistExportRow)];
   const statsValues = [[...ARTIST_STATS_SHEET_HEADERS], ...stats.map(artistStatsExportRow)];
+  const followersHistoryValues = buildMetricHistoryValues({ artists, stats, metric: "followers" });
+  const postsHistoryValues = buildMetricHistoryValues({ artists, stats, metric: "post_count" });
   const contactsValues = [[...ARTIST_CONTACTS_SHEET_HEADERS], ...contacts.map(artistContactExportRow)];
   const collaborationsValues = [
     [...ARTIST_COLLABORATIONS_SHEET_HEADERS],
@@ -413,11 +455,14 @@ export async function exportAdminSheets() {
     ...b2bProfiles.map(artistB2bProfileExportRow)
   ];
 
+  await ensureSheetTabs(spreadsheetId, ["followers_history", "posts_history"]);
   await Promise.all([
     clearSheetRange(spreadsheetId, "categories!A1:D10000"),
     clearSheetRange(spreadsheetId, "brand_categories!A1:D10000"),
     clearSheetRange(spreadsheetId, "artists!A1:V10000"),
     clearSheetRange(spreadsheetId, "artist_stats!A1:D10000"),
+    clearSheetRange(spreadsheetId, "followers_history!A1:ZZZ10000"),
+    clearSheetRange(spreadsheetId, "posts_history!A1:ZZZ10000"),
     clearSheetRange(spreadsheetId, "artist_contacts!A1:D10000"),
     clearSheetRange(spreadsheetId, "artist_collaborations!A1:N10000"),
     clearSheetRange(spreadsheetId, "artist_b2b_profiles!A1:F10000")
@@ -427,6 +472,8 @@ export async function exportAdminSheets() {
     updateSheetValues(spreadsheetId, "brand_categories!A1", brandCategoriesValues),
     updateSheetValues(spreadsheetId, "artists!A1", artistsValues),
     updateSheetValues(spreadsheetId, "artist_stats!A1", statsValues),
+    updateSheetValues(spreadsheetId, "followers_history!A1", followersHistoryValues),
+    updateSheetValues(spreadsheetId, "posts_history!A1", postsHistoryValues),
     updateSheetValues(spreadsheetId, "artist_contacts!A1", contactsValues),
     updateSheetValues(spreadsheetId, "artist_collaborations!A1", collaborationsValues),
     updateSheetValues(spreadsheetId, "artist_b2b_profiles!A1", b2bProfilesValues)
@@ -436,7 +483,9 @@ export async function exportAdminSheets() {
     categories: categories.length,
     brand_categories: brandCategories.length,
     artists: artists.length,
-    artist_stats: stats.length,
+    followers_history_artists: Math.max(followersHistoryValues.length - 1, 0),
+    posts_history_artists: Math.max(postsHistoryValues.length - 1, 0),
+    history_dates: Math.max(followersHistoryValues[0].length - 3, 0),
     artist_contacts: contacts.length,
     artist_collaborations: collaborations.length,
     artist_b2b_profiles: b2bProfiles.length

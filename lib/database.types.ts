@@ -116,7 +116,16 @@ export type Database = {
       artist_event_logs: Row<{
         id: string;
         artist_id: string;
-        event_type: "artist_click" | "instagram_outbound";
+        event_type:
+          | "artist_click"
+          | "instagram_outbound"
+          | "profile_click"
+          | "instagram_click"
+          | "embed_click"
+          | "hero_click"
+          | "toonbti_result_click"
+          | "toonbti_character_click"
+          | "random_click";
         created_at: string;
       }>;
       search_query_logs: Row<{

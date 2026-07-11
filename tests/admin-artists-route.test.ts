@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { revalidatePath } from "next/cache";
 
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { sanitizeArtistPayload } from "@/lib/domain/admin-artist";
@@ -9,11 +10,13 @@ import { DELETE, POST } from "@/app/api/artists/route";
 
 vi.mock("@/lib/admin-auth", () => ({ isAdminAuthenticated: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ getSupabaseAdminClient: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 describe("Admin artist write boundary", () => {
   beforeEach(() => {
     vi.mocked(isAdminAuthenticated).mockReset();
     vi.mocked(getSupabaseAdminClient).mockReset();
+    vi.mocked(revalidatePath).mockReset();
   });
 
   it("rejects unauthenticated writes before reading the request body", async () => {
@@ -116,5 +119,7 @@ describe("Admin artist write boundary", () => {
       })
     );
     expect(deleteCall).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+    expect(revalidatePath).toHaveBeenCalledWith("/sitemap.xml");
   });
 });

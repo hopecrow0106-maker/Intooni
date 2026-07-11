@@ -319,14 +319,18 @@ function getAdminTabMeta(tab: AdminTab) {
 function StatsCard({
   label,
   value,
-  helper
+  helper,
+  onClick,
+  active = false
 }: {
   label: string;
   value: string;
   helper?: string;
+  onClick?: () => void;
+  active?: boolean;
 }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold uppercase text-slate-500">{label}</p>
@@ -334,7 +338,26 @@ function StatsCard({
         </div>
         <p className="shrink-0 text-xl font-bold tracking-[-0.02em] text-ink">{value}</p>
       </div>
-    </div>
+    </>
+  );
+
+  if (!onClick) {
+    return <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">{content}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-xl border px-4 py-3 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${
+        active
+          ? "border-slate-900 bg-slate-900 [&_p]:text-white"
+          : "border-slate-200 bg-white hover:border-slate-400 hover:bg-slate-50"
+      }`}
+    >
+      {content}
+    </button>
   );
 }
 
@@ -635,6 +658,22 @@ function formatSheetSummaryValue(value: unknown) {
   return JSON.stringify(value);
 }
 
+const SHEET_SUMMARY_LABELS: Record<string, string> = {
+  categories: "카테고리",
+  brand_categories: "브랜드 카테고리",
+  artists: "작가",
+  followers_history_artists: "팔로워 이력 작가",
+  posts_history_artists: "게시물 이력 작가",
+  history_dates: "수집 날짜",
+  artist_contacts: "작가 연락처",
+  artist_collaborations: "협업 이력",
+  artist_b2b_profiles: "B2B 프로필"
+};
+
+function formatSheetSummaryLabel(key: string) {
+  return SHEET_SUMMARY_LABELS[key] ?? key;
+}
+
 function AdminSheetsPanel({
   busyOperation,
   status,
@@ -766,7 +805,9 @@ function AdminSheetsPanel({
             <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {Object.entries(status.summary).map(([key, value]) => (
                 <div key={key} className="rounded-md bg-white/70 px-3 py-2">
-                  <dt className="text-[11px] font-semibold uppercase text-slate-500">{key}</dt>
+                  <dt className="text-[11px] font-semibold text-slate-500">
+                    {formatSheetSummaryLabel(key)}
+                  </dt>
                   <dd className="mt-1 font-bold text-ink">{formatSheetSummaryValue(value)}</dd>
                 </div>
               ))}
@@ -863,6 +904,37 @@ export default function AdminPage() {
   const [sheetOperationStatus, setSheetOperationStatus] =
     useState<SheetOperationStatus | null>(null);
   const [sheetPreviewRows, setSheetPreviewRows] = useState<SheetPreviewDisplayRow[]>([]);
+
+  const resetArtistFilters = () => {
+    setArtistSearch("");
+    setShowHiddenTagMissingOnly(false);
+    setShowCharacterMissingOnly(false);
+    setVisibilityFilter("all");
+    setStatusFilter("all");
+    setGrowthFilter("all");
+    setTrendingFilter("all");
+    setCategoryFilter("all");
+    setInternalDataFilter("all");
+  };
+
+  const archivedOnlyFilterActive =
+    !artistSearch.trim() &&
+    !showHiddenTagMissingOnly &&
+    !showCharacterMissingOnly &&
+    visibilityFilter === "all" &&
+    statusFilter === "archived" &&
+    growthFilter === "all" &&
+    trendingFilter === "all" &&
+    categoryFilter === "all" &&
+    internalDataFilter === "all";
+
+  const toggleArchivedArtistFilter = () => {
+    const shouldClear = archivedOnlyFilterActive;
+    resetArtistFilters();
+    if (!shouldClear) {
+      setStatusFilter("archived");
+    }
+  };
 
   const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -1769,13 +1841,20 @@ export default function AdminPage() {
               </button>
             </div>
 
-            <div className="max-w-md">
+            <div className="flex max-w-2xl flex-col gap-2 sm:flex-row">
               <input
                 value={artistSearch}
                 onChange={(event) => setArtistSearch(event.target.value)}
                 placeholder="작가명, 인스타 계정, 카테고리, 태그로 검색"
-                className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-ink"
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-ink"
               />
+              <button
+                type="button"
+                onClick={resetArtistFilters}
+                className="shrink-0 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-ink"
+              >
+                필터 초기화
+              </button>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -1788,7 +1867,7 @@ export default function AdminPage() {
               <label className="space-y-1">
                 <span className="text-xs font-semibold text-slate-500">관리 상태</span>
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  <option value="all">전체</option><option value="active">활성</option><option value="hidden">숨김</option><option value="archived">보관</option>
+                  <option value="all">전체</option><option value="active">활성</option><option value="hidden">숨김</option><option value="archived">보관 처리</option>
                 </select>
               </label>
               <label className="space-y-1">
@@ -1831,8 +1910,10 @@ export default function AdminPage() {
             />
             <StatsCard
               label="내부 전용"
-              value={formatNumber(sortedArtists.filter((artist) => artist.status !== "active" || !artist.show_on_site).length)}
-              helper="숨김·보관 또는 사이트 비공개"
+              value={formatNumber(sortedArtists.filter((artist) => artist.status === "archived").length)}
+              helper="보관 처리된 작가 · 클릭해서 보기"
+              onClick={toggleArchivedArtistFilter}
+              active={archivedOnlyFilterActive}
             />
             <StatsCard
               label="데이터 보강 필요"

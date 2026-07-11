@@ -14,6 +14,8 @@
 - `brand_categories`
 - `artists`
 - `artist_stats`
+- `followers_history`
+- `posts_history`
 - `artist_contacts`
 - `artist_collaborations`
 - `artist_b2b_profiles`
@@ -31,6 +33,7 @@
 - 모든 한글 텍스트는 NFC로 정규화한다.
 - Sheets 행 삭제는 DB 삭제가 아니다.
 - `artist_stats`는 일반 export/view 탭이며 공식 통계 원본은 Supabase `artist_stats`다.
+- `followers_history`와 `posts_history`는 조회 전용 피벗 탭이다. 작가가 행, 날짜가 열이며 Admin export 때 다시 생성된다.
 - `collector_*` 탭은 Collector 검토와 운영 보조용이며, 편집만으로 DB에 자동 반영되지 않는다.
 - Admin의 일반 preview/apply 대상은 `categories`, `brand_categories`, `artists`, `artist_contacts`, `artist_collaborations`, `artist_b2b_profiles`다.
 - `artist_stats`는 일반 흐름과 분리된 명시적 과거 통계 백필 모드에서만 preview/apply한다.

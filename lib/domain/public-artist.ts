@@ -130,8 +130,7 @@ function buildStats({
   const previousFollowers = previous?.followers ?? null;
   const previousPostCount = previous?.post_count ?? null;
   const comparisonIntervalDays = dateIntervalDays(latest?.recorded_date, previous?.recorded_date);
-  const isWeeklyComparable =
-    comparisonIntervalDays !== null && comparisonIntervalDays >= 5 && comparisonIntervalDays <= 9;
+  const isComparable = comparisonIntervalDays !== null;
 
   if (!showGrowth) {
     return {
@@ -152,19 +151,19 @@ function buildStats({
     followers,
     post_count: postCount,
     followers_delta:
-      isWeeklyComparable && followers !== null && previousFollowers !== null
+      isComparable && followers !== null && previousFollowers !== null
         ? followers - previousFollowers
         : null,
-    followers_growth_rate: isWeeklyComparable ? growthRate(followers, previousFollowers) : null,
+    followers_growth_rate: isComparable ? growthRate(followers, previousFollowers) : null,
     posts_delta:
-      isWeeklyComparable && postCount !== null && previousPostCount !== null
+      isComparable && postCount !== null && previousPostCount !== null
         ? postCount - previousPostCount
         : null,
-    posts_growth_rate: isWeeklyComparable ? growthRate(postCount, previousPostCount) : null,
+    posts_growth_rate: isComparable ? growthRate(postCount, previousPostCount) : null,
     latest_recorded_date: latest?.recorded_date ?? null,
     previous_recorded_date: previous?.recorded_date ?? null,
     comparison_interval_days: comparisonIntervalDays,
-    is_weekly_comparable: isWeeklyComparable
+    is_weekly_comparable: isComparable
   };
 }
 

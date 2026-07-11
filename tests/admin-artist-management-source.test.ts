@@ -62,6 +62,10 @@ describe("Admin artist management surface", () => {
     expect(adminPage).toContain("연락정보 있음");
     expect(adminPage).toContain("협업 있음");
     expect(adminPage).toContain("B2B 있음");
+    expect(adminPage).toContain("toggleArchivedArtistFilter");
+    expect(adminPage).toContain('setStatusFilter("archived")');
+    expect(adminPage).toContain("보관 처리된 작가 · 클릭해서 보기");
+    expect(adminPage).toContain("필터 초기화");
     expect(artistTable).toContain("보관");
     expect(artistTable).not.toContain(">\n                          삭제\n");
   });

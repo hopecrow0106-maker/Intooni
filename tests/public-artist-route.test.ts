@@ -59,6 +59,7 @@ describe("public artist API routes", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store, no-cache, must-revalidate");
     expect(payload).toEqual({ artists: [publicArtist] });
     expect(assertNoForbiddenPublicArtistKeys(payload)).toEqual([]);
   });
@@ -73,6 +74,7 @@ describe("public artist API routes", () => {
 
     expect(response.status).toBe(200);
     expect(getPublicArtistByHandle).toHaveBeenCalledWith("public_artist");
+    expect(response.headers.get("Cache-Control")).toBe("no-store, no-cache, must-revalidate");
     expect(payload).toEqual({ artist: publicArtist });
     expect(assertNoForbiddenPublicArtistKeys(payload)).toEqual([]);
   });

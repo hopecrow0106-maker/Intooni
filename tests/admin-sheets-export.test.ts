@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { exportAdminSheets } from "@/lib/server/admin-sheets";
 import {
   clearSheetRange,
+  ensureSheetTabs,
   ensureGoogleSheetsEnabled,
   getGoogleSheetsSpreadsheetId,
   updateSheetValues
@@ -13,6 +14,7 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/lib/server/google-sheets", () => ({
   clearSheetRange: vi.fn(() => Promise.resolve()),
+  ensureSheetTabs: vi.fn(() => Promise.resolve()),
   ensureGoogleSheetsEnabled: vi.fn(),
   getGoogleSheetsSpreadsheetId: vi.fn(),
   updateSheetValues: vi.fn(() => Promise.resolve())
@@ -67,7 +69,10 @@ function setupSupabase() {
         main_category: { name: "daily" }
       }
     ],
-    artist_stats: [],
+    artist_stats: [
+      { artist_id: "artist-1", recorded_date: "2026-07-11", followers: 140, post_count: 14 },
+      { artist_id: "artist-1", recorded_date: "2026-07-04", followers: 100, post_count: 10 }
+    ],
     artist_contacts: [],
     artist_collaborations: [],
     artist_b2b_profiles: []
@@ -85,7 +90,7 @@ function setupSupabase() {
           order: vi.fn(() => {
             if (table === "artist_stats") {
               return {
-                limit: vi.fn(() => Promise.resolve({ data: tableData[table], error: null }))
+                range: vi.fn(() => Promise.resolve({ data: tableData[table], error: null }))
               };
             }
 
@@ -114,6 +119,7 @@ function valuesForRange(range: string) {
 describe("admin sheets export workflow", () => {
   beforeEach(() => {
     vi.mocked(clearSheetRange).mockClear();
+    vi.mocked(ensureSheetTabs).mockClear();
     vi.mocked(ensureGoogleSheetsEnabled).mockClear();
     vi.mocked(getGoogleSheetsSpreadsheetId).mockReset();
     vi.mocked(updateSheetValues).mockClear();
@@ -127,10 +133,18 @@ describe("admin sheets export workflow", () => {
     const summary = await exportAdminSheets();
     const categoryValues = valuesForRange("categories!A1");
     const artistValues = valuesForRange("artists!A1");
+    const followersHistory = valuesForRange("followers_history!A1");
+    const postsHistory = valuesForRange("posts_history!A1");
     const categorySelect = selects.find((call) => call.table === "categories")?.columns ?? "";
     const artistSelect = selects.find((call) => call.table === "artists")?.columns ?? "";
 
     expect(summary).toMatchObject({ categories: 1, artists: 1 });
+    expect(summary).not.toHaveProperty("artist_stats");
+    expect(summary).toMatchObject({
+      followers_history_artists: 1,
+      posts_history_artists: 1,
+      history_dates: 2
+    });
     expect(categorySelect).toContain("updated_at");
     expect(artistSelect).toContain("main_category:categories!artists_main_category_id_fkey(id, name)");
     expect(artistSelect).not.toContain("hidden_tags");
@@ -145,6 +159,18 @@ describe("admin sheets export workflow", () => {
     expect(artistValues[0][3]).toBe("main_category_id");
     expect(artistValues[0][4]).toBe("main_category_name");
     expect(artistValues[1][4]).toBe("daily");
+    expect(ensureSheetTabs).toHaveBeenCalledWith("spreadsheet-1", [
+      "followers_history",
+      "posts_history"
+    ]);
+    expect(followersHistory).toEqual([
+      ["artist_id", "name", "instagram_handle", "2026-07-04", "2026-07-11"],
+      ["artist-1", "Export Artist", "export_artist", 100, 140]
+    ]);
+    expect(postsHistory).toEqual([
+      ["artist_id", "name", "instagram_handle", "2026-07-04", "2026-07-11"],
+      ["artist-1", "Export Artist", "export_artist", 10, 14]
+    ]);
     expect(inserts).toContainEqual(
       expect.objectContaining({
         table: "sheet_sync_jobs",

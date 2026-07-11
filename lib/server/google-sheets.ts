@@ -135,6 +135,29 @@ export async function clearSheetRange(spreadsheetId: string, range: string) {
   });
 }
 
+export async function ensureSheetTabs(spreadsheetId: string, sheetNames: string[]) {
+  const result = (await sheetsFetch(
+    `${spreadsheetId}?fields=sheets.properties.title`
+  )) as {
+    sheets?: Array<{ properties?: { title?: string } }>;
+  };
+  const existing = new Set(
+    (result.sheets ?? []).map((sheet) => sheet.properties?.title).filter(Boolean)
+  );
+  const missing = Array.from(new Set(sheetNames)).filter((sheetName) => !existing.has(sheetName));
+
+  if (missing.length === 0) return;
+
+  await sheetsFetch(`${spreadsheetId}:batchUpdate`, {
+    method: "POST",
+    body: JSON.stringify({
+      requests: missing.map((title) => ({
+        addSheet: { properties: { title } }
+      }))
+    })
+  });
+}
+
 export async function updateSheetValues(spreadsheetId: string, range: string, values: unknown[][]) {
   return sheetsFetch(`${spreadsheetId}/values/${encodeRange(range)}?valueInputOption=RAW`, {
     method: "PUT",

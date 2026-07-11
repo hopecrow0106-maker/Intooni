@@ -92,7 +92,7 @@ describe("public artist DTO", () => {
     expect(dto.stats.is_weekly_comparable).toBe(true);
   });
 
-  it("does not label a 14-day interval as weekly growth", () => {
+  it("calculates growth across the actual interval without a weekly cutoff", () => {
     const dto = toPublicArtistDTO(
       {
         id: "artist-gap",
@@ -108,10 +108,10 @@ describe("public artist DTO", () => {
 
     expect(dto.stats.followers).toBe(140);
     expect(dto.stats.comparison_interval_days).toBe(14);
-    expect(dto.stats.is_weekly_comparable).toBe(false);
-    expect(dto.stats.followers_delta).toBeNull();
-    expect(dto.stats.followers_growth_rate).toBeNull();
-    expect(dto.stats.posts_delta).toBeNull();
+    expect(dto.stats.is_weekly_comparable).toBe(true);
+    expect(dto.stats.followers_delta).toBe(40);
+    expect(dto.stats.followers_growth_rate).toBe(0.4);
+    expect(dto.stats.posts_delta).toBe(4);
   });
 
   it("uses legacy current counts without inventing growth when no stat history exists", () => {

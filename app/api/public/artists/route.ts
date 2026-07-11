@@ -7,11 +7,17 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const artists = await listPublicArtists();
-    return NextResponse.json({ artists });
+    return NextResponse.json(
+      { artists },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch {
     return NextResponse.json(
       { message: "공개 작가 목록을 불러오지 못했습니다." },
-      { status: 500 }
+      {
+        status: 500,
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" }
+      }
     );
   }
 }
