@@ -1,6 +1,9 @@
+import crypto from "node:crypto";
+
 import { cookies } from "next/headers";
 
 export const ADMIN_COOKIE_NAME = "instoon-admin-session";
+export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 
 const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -12,6 +15,13 @@ type LoginAttemptEntry = {
 
 const loginAttempts = new Map<string, LoginAttemptEntry>();
 
+type AdminSessionPayload = {
+  exp: number;
+  iat: number;
+  nonce: string;
+  v: 1;
+};
+
 export function getAdminPassword() {
   const password = process.env.ADMIN_PASSWORD;
 
@@ -22,8 +32,79 @@ export function getAdminPassword() {
   return password;
 }
 
+export function getAdminSessionSecret() {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+
+  if (!secret) {
+    throw new Error("ADMIN_SESSION_SECRET is missing. Add it to your environment variables.");
+  }
+
+  return secret;
+}
+
+function base64UrlEncode(value: string | Buffer) {
+  return Buffer.from(value).toString("base64url");
+}
+
+function base64UrlDecode(value: string) {
+  return Buffer.from(value, "base64url").toString("utf8");
+}
+
+function signPayload(encodedPayload: string) {
+  return crypto
+    .createHmac("sha256", getAdminSessionSecret())
+    .update(encodedPayload)
+    .digest("base64url");
+}
+
+function safeEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+export function createAdminSessionToken() {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload: AdminSessionPayload = {
+    v: 1,
+    iat: issuedAt,
+    exp: issuedAt + ADMIN_SESSION_MAX_AGE_SECONDS,
+    nonce: crypto.randomBytes(16).toString("base64url")
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signature = signPayload(encodedPayload);
+
+  return `${encodedPayload}.${signature}`;
+}
+
+export function verifyAdminSessionToken(token?: string) {
+  if (!token) {
+    return false;
+  }
+
+  const [encodedPayload, signature, extra] = token.split(".");
+  if (!encodedPayload || !signature || extra !== undefined) {
+    return false;
+  }
+
+  const expectedSignature = signPayload(encodedPayload);
+  if (!safeEqual(signature, expectedSignature)) {
+    return false;
+  }
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload)) as Partial<AdminSessionPayload>;
+    const now = Math.floor(Date.now() / 1000);
+
+    return payload.v === 1 && typeof payload.exp === "number" && payload.exp > now;
+  } catch {
+    return false;
+  }
+}
+
 export function isAdminAuthenticated() {
-  return cookies().get(ADMIN_COOKIE_NAME)?.value === "authenticated";
+  return verifyAdminSessionToken(cookies().get(ADMIN_COOKIE_NAME)?.value);
 }
 
 export function getClientIp(request: Request) {

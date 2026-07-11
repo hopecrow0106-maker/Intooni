@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getErrorMessage } from "@/lib/api-error";
-import { getSupabaseAdminClient, getSupabasePublicServerClient } from "@/lib/supabase";
+import { listPublicMagazines } from "@/lib/server/public-magazines";
+import { getSupabaseAdminClient } from "@/lib/supabase";
 import type { MagazineInsert } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -23,35 +24,110 @@ function extractStoragePath(publicUrl: string) {
   return decodeURIComponent(publicUrl.slice(index + marker.length));
 }
 
+function isMissingMagazineArtistsTable(error: unknown) {
+  const message = getErrorMessage(error, "").toLowerCase();
+  return (
+    message.includes("magazine_artists") &&
+    (message.includes("does not exist") ||
+      message.includes("could not find a relationship") ||
+      message.includes("schema cache"))
+  );
+}
+
+async function syncMagazineArtists(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  magazineId: string,
+  artistIds: string[]
+) {
+  const uniqueArtistIds = Array.from(new Set((artistIds ?? []).filter(Boolean)));
+
+  const { error: deleteError } = await (supabase as any)
+    .from("magazine_artists")
+    .delete()
+    .eq("magazine_id", magazineId);
+
+  if (deleteError) {
+    if (isMissingMagazineArtistsTable(deleteError)) {
+      const legacyUpdate = await (supabase as any)
+        .from("magazines")
+        .update({ related_artist_ids: uniqueArtistIds })
+        .eq("id", magazineId);
+      if (legacyUpdate.error) throw legacyUpdate.error;
+      return;
+    }
+
+    throw deleteError;
+  }
+
+  if (uniqueArtistIds.length === 0) {
+    return;
+  }
+
+  const rows = uniqueArtistIds.map((artistId, index) => ({
+    magazine_id: magazineId,
+    artist_id: artistId,
+    sort_order: index
+  }));
+  const { error: insertError } = await (supabase as any).from("magazine_artists").insert(rows);
+
+  if (insertError) {
+    throw insertError;
+  }
+}
+
 export async function GET() {
+  const isAdmin = isAdminAuthenticated();
   try {
-    const isAdmin = isAdminAuthenticated();
-    const supabase = isAdmin ? getSupabaseAdminClient() : getSupabasePublicServerClient();
+    let data;
 
-    let query = supabase
-      .from("magazines")
-      .select("*")
-      .order("published_at", { ascending: false })
-      .order("created_at", { ascending: false });
+    if (isAdmin) {
+      const supabase = getSupabaseAdminClient();
+      const result = await supabase
+        .from("magazines")
+        .select(
+          "id, title, tag, content, thumbnail_url, instagram_urls, view_count, is_public, published_at, created_at, magazine_artists(artist_id, sort_order)"
+        )
+        .order("published_at", { ascending: false })
+        .order("created_at", { ascending: false });
 
-    if (!isAdmin) {
-      query = query.eq("is_public", true);
+      if (result.error && isMissingMagazineArtistsTable(result.error)) {
+        const legacyResult = await (supabase as any)
+          .from("magazines")
+          .select(
+            "id, title, tag, content, thumbnail_url, instagram_urls, view_count, is_public, published_at, created_at, related_artist_ids"
+          )
+          .order("published_at", { ascending: false })
+          .order("created_at", { ascending: false });
+
+        if (legacyResult.error) throw legacyResult.error;
+        data = legacyResult.data ?? [];
+      } else {
+        if (result.error) throw result.error;
+
+        data = (result.data ?? []).map((magazine: any) => ({
+          ...magazine,
+          related_artist_ids: [...(magazine.magazine_artists ?? [])]
+            .sort((left, right) => left.sort_order - right.sort_order)
+            .map((relation) => relation.artist_id),
+          magazine_artists: undefined
+        }));
+      }
+    } else {
+      data = await listPublicMagazines();
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json(data ?? [], {
+    return NextResponse.json(data, {
       headers: {
         "Cache-Control": "no-store"
       }
     });
   } catch (error) {
     return NextResponse.json(
-      { message: getErrorMessage(error, "매거진 목록을 불러오지 못했습니다.") },
+      {
+        message: isAdmin
+          ? getErrorMessage(error, "매거진 목록을 불러오지 못했습니다.")
+          : "매거진 목록을 불러오지 못했습니다."
+      },
       { status: 500 }
     );
   }
@@ -66,12 +142,15 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdminClient();
     const payload = (await request.json()) as MagazineInsert;
     payload.instagram_urls = (payload.instagram_urls ?? []).slice(0, 4);
+    const { related_artist_ids: relatedArtistIds = [], ...magazinePayload } = payload;
 
-    const { data, error } = await supabase.from("magazines").insert(payload).select().single();
+    const { data, error } = await supabase.from("magazines").insert(magazinePayload).select().single();
 
     if (error) {
       throw error;
     }
+
+    await syncMagazineArtists(supabase, data.id, relatedArtistIds);
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
@@ -91,15 +170,16 @@ export async function PUT(request: Request) {
     const supabase = getSupabaseAdminClient();
     const payload = (await request.json()) as MagazineInsert;
     payload.instagram_urls = (payload.instagram_urls ?? []).slice(0, 4);
+    const { related_artist_ids: relatedArtistIds = [], id, ...magazinePayload } = payload;
 
-    if (!payload.id) {
+    if (!id) {
       return NextResponse.json({ message: "매거진 id가 필요합니다." }, { status: 400 });
     }
 
     const { data: existingMagazine, error: existingMagazineError } = await supabase
       .from("magazines")
       .select("thumbnail_url")
-      .eq("id", payload.id)
+      .eq("id", id)
       .single();
 
     if (existingMagazineError) {
@@ -108,14 +188,16 @@ export async function PUT(request: Request) {
 
     const { data, error } = await supabase
       .from("magazines")
-      .update(payload)
-      .eq("id", payload.id)
+      .update(magazinePayload)
+      .eq("id", id)
       .select()
       .single();
 
     if (error) {
       throw error;
     }
+
+    await syncMagazineArtists(supabase, data.id, relatedArtistIds);
 
     if (existingMagazine?.thumbnail_url && existingMagazine.thumbnail_url !== payload.thumbnail_url) {
       const oldPath = extractStoragePath(existingMagazine.thumbnail_url);

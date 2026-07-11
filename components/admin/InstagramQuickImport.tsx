@@ -11,8 +11,6 @@ type InstagramImportProfile = {
   displayName?: string;
   bio?: string;
   profileImageUrl?: string;
-  followersCount?: number;
-  postsCount?: number;
 };
 
 type InstagramImportResponse = {
@@ -108,10 +106,7 @@ export function InstagramQuickImport({ onApply }: InstagramQuickImportProps) {
         instagram_handle: profile.username ?? "",
         name: profile.displayName || profile.username || "",
         bio: profile.bio ?? "",
-        memo: profile.bio ?? "",
         thumbnail_url: profile.profileImageUrl ?? "",
-        followers: profile.followersCount ?? 0,
-        post_count: profile.postsCount ?? 0,
         gallery_post_urls: [...normalizedPostUrls, "", "", "", ""].slice(0, 4)
       });
 

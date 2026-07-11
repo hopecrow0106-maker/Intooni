@@ -4,9 +4,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
+import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
+import type { PublicArtistDTO } from "@/lib/domain/public-artist";
 import { ARTIST_SQUARE_PLACEHOLDER } from "@/lib/placeholders";
 import { getSiteUrl, SITE_NAME } from "@/lib/site";
-import { getSupabasePublicServerClient } from "@/lib/supabase";
+import { getPublicArtistByHandle } from "@/lib/server/public-artists";
 
 type ArtistDetailPageProps = {
   params: {
@@ -26,6 +28,10 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("ko-KR").format(value);
 }
 
+function formatOptionalCount(value: number | null) {
+  return value === null ? "-" : formatCount(value);
+}
+
 function AdSidebarPlaceholder() {
   return (
     <div className="sticky top-20 flex min-h-[600px] w-[160px] items-center justify-center rounded-lg bg-gray-100">
@@ -38,13 +44,7 @@ function normalizeArtistSlug(value: string) {
   return decodeURIComponent(value).replace(/^@/, "").trim();
 }
 
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
-}
-
-function getArtistSlug(artist: { id: string; instagram_handle: string }) {
+function getArtistSlug(artist: Pick<PublicArtistDTO, "id" | "instagram_handle">) {
   const handle = artist.instagram_handle.replace(/^@/, "").trim();
   return encodeURIComponent(handle || artist.id);
 }
@@ -65,12 +65,11 @@ function joinKoreanList(values: string[], fallback: string) {
 function buildArtistSeoDescription(artist: {
   name: string;
   instagram_handle: string;
-  genre: string;
+  category: string;
   bio: string;
   hashtags: string[];
-  hidden_tags: string[];
+  search_tags: string[];
   mood_tags: string[];
-  episode_formats: string[];
   style_tags: string[];
   topic_tags: string[];
 }) {
@@ -81,52 +80,21 @@ function buildArtistSeoDescription(artist: {
     ...artist.style_tags,
     ...artist.mood_tags
   ]);
-  const hiddenKeywords = uniqueKeywords(artist.hidden_tags);
-  const searchKeywords = joinKoreanList([...visibleKeywords, ...hiddenKeywords], artist.genre);
-  const styleKeywords = joinKoreanList([...artist.style_tags, ...artist.mood_tags], artist.genre);
-  const topicKeywords = joinKoreanList([...artist.topic_tags, ...artist.hashtags], artist.genre);
+  const searchKeywords = joinKoreanList([...visibleKeywords, ...artist.search_tags], artist.category);
+  const styleKeywords = joinKoreanList([...artist.style_tags, ...artist.mood_tags], artist.category);
+  const topicKeywords = joinKoreanList([...artist.topic_tags, ...artist.hashtags], artist.category);
   const bio = artist.bio.trim();
 
   if (bio) {
     return `${artist.name}는 ${bio} 인스타툰 작가입니다. ${searchKeywords} 같은 키워드로 찾는 분들에게 추천되며, 인스타 아이디는 @${handle}입니다.`;
   }
 
-  return `${artist.name}는 ${styleKeywords} 분위기와 ${topicKeywords} 주제를 다루는 ${artist.genre} 인스타툰 작가입니다. 인스타 아이디는 @${handle}이며, 인투니에서 ${searchKeywords} 같은 해시태그와 키워드로 쉽게 찾을 수 있습니다.`;
+  return `${artist.name}는 ${styleKeywords} 분위기와 ${topicKeywords} 주제를 다루는 ${artist.category} 인스타툰 작가입니다. 인스타 아이디는 @${handle}이며, 인투니에서 ${searchKeywords} 같은 해시태그와 키워드로 쉽게 찾을 수 있습니다.`;
 }
 
 async function getArtistBySlug(slug: string) {
-  const supabase = getSupabasePublicServerClient();
   const normalizedSlug = normalizeArtistSlug(slug);
-
-  const { data: artistByHandle, error: handleError } = await supabase
-    .from("artists")
-    .select("*")
-    .eq("instagram_handle", normalizedSlug)
-    .maybeSingle();
-
-  if (artistByHandle) {
-    return artistByHandle;
-  }
-
-  if (!handleError && !isUuid(normalizedSlug)) {
-    return null;
-  }
-
-  if (!isUuid(normalizedSlug)) {
-    return null;
-  }
-
-  const { data, error } = await supabase
-    .from("artists")
-    .select("*")
-    .eq("id", normalizedSlug)
-    .maybeSingle();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data;
+  return getPublicArtistByHandle(normalizedSlug);
 }
 
 export async function generateMetadata({
@@ -145,7 +113,7 @@ export async function generateMetadata({
   const image = artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER;
   const artistSlug = getArtistSlug(artist);
   const url = `${getSiteUrl()}/artists/${artistSlug}`;
-  const title = `${artist.name} | ${artist.genre} 작가 | ${SITE_NAME}`;
+  const title = `${artist.name} | ${artist.category} 작가 | ${SITE_NAME}`;
 
   return {
     title,
@@ -210,14 +178,14 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
             >
               ← 홈으로
             </Link>
-            <a
+            <TrackedArtistActionLink
+              artistId={artist.id}
+              eventType="instagram_outbound"
               href={`https://instagram.com/${artist.instagram_handle.replace(/^@/, "")}`}
-              target="_blank"
-              rel="noreferrer"
               className="inline-flex items-center rounded-full bg-[#ff4d6d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#e83a5a]"
             >
               인스타 바로가기
-            </a>
+            </TrackedArtistActionLink>
           </div>
 
           <div className="grid gap-6 overflow-hidden rounded-[28px] border border-[rgba(0,0,0,0.08)] bg-white p-5 shadow-[0_16px_40px_rgba(0,0,0,0.06)] md:grid-cols-[340px_minmax(0,1fr)] md:p-8">
@@ -252,17 +220,10 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
 
             <div className="space-y-5">
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#1a1a1a] md:text-5xl">
-                    {artist.name}
-                  </h1>
-                  {artist.is_ad && (
-                    <span className="rounded-full border border-[#FFD740] bg-[#FFF8E1] px-3 py-1 text-[10px] font-bold text-[#7A5800]">
-                      AD
-                    </span>
-                  )}
-                </div>
-                <p className="text-base font-medium text-[#8a8a8a]">{artist.genre} 작가</p>
+                <h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#1a1a1a] md:text-5xl">
+                  {artist.name}
+                </h1>
+                <p className="text-base font-medium text-[#8a8a8a]">{artist.category} 작가</p>
                 <div className="flex flex-wrap gap-2">
                   {artist.hashtags.map((tag) => (
                     <span
@@ -278,22 +239,17 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-4">
                   <p className="text-[11px] text-[#a0a0a0]">팔로워</p>
-                  <p className="mt-1 text-xl font-bold text-[#1a1a1a]">👥 {formatCount(artist.followers)}</p>
+                  <p className="mt-1 text-xl font-bold text-[#1a1a1a]">
+                    👥 {formatOptionalCount(artist.stats.followers)}
+                  </p>
                 </div>
                 <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-4">
                   <p className="text-[11px] text-[#a0a0a0]">게시물 수</p>
-                  <p className="mt-1 text-xl font-bold text-[#1a1a1a]">📚 {formatCount(artist.post_count)}</p>
-                </div>
-              </div>
-
-              {artist.memo.trim() && (
-                <div className="rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-[#fffaf3] px-4 py-4">
-                  <p className="text-[11px] text-[#a0a0a0]">메모</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[#1a1a1a]">
-                    {artist.memo}
+                  <p className="mt-1 text-xl font-bold text-[#1a1a1a]">
+                    📚 {formatOptionalCount(artist.stats.post_count)}
                   </p>
                 </div>
-              )}
+              </div>
 
               <section className="rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white px-4 py-4">
                 <h2 className="text-sm font-bold text-[#1a1a1a]">작가 소개</h2>
@@ -307,11 +263,20 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
             {galleryPostUrls.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {galleryPostUrls.map((url, index) => (
-                  <InstagramEmbed
-                    key={`${artist.id}-${index}`}
-                    url={url}
-                    className="min-h-[360px] rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.05)]"
-                  />
+                  <div key={`${artist.id}-${index}`} className="space-y-2">
+                    <InstagramEmbed
+                      url={url}
+                      className="min-h-[360px] rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.05)]"
+                    />
+                    <TrackedArtistActionLink
+                      artistId={artist.id}
+                      eventType="instagram_outbound"
+                      href={url}
+                      className="inline-flex rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-[#ff4d6d] hover:text-[#c9153d]"
+                    >
+                      게시물 보러가기
+                    </TrackedArtistActionLink>
+                  </div>
                 ))}
               </div>
             ) : (

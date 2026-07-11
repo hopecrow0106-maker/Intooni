@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo } from "react";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
@@ -21,62 +21,6 @@ function formatCount(value: number) {
   }
 
   return new Intl.NumberFormat("ko-KR").format(value);
-}
-
-function isSafeHref(value: string) {
-  return /^(https?:\/\/|mailto:)/i.test(value);
-}
-
-function renderMemoWithLinks(value: string) {
-  const nodes: ReactNode[] = [];
-  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)\s]+|mailto:[^)\s]+)\)|(https?:\/\/[^\s]+|mailto:[^\s]+)/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  const pushText = (text: string) => {
-    text.split("\n").forEach((line, index) => {
-      if (index > 0) {
-        nodes.push(<br key={`br-${nodes.length}`} />);
-      }
-      if (line) {
-        nodes.push(line);
-      }
-    });
-  };
-
-  while ((match = linkRegex.exec(value)) !== null) {
-    if (match.index > lastIndex) {
-      pushText(value.slice(lastIndex, match.index));
-    }
-
-    const label = match[1] ?? match[3];
-    const href = match[2] ?? match[3];
-
-    if (href && isSafeHref(href)) {
-      nodes.push(
-        <a
-          key={`link-${nodes.length}`}
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          className="font-semibold text-[#ff4d6d] underline decoration-[#ff4d6d]/30 underline-offset-4 transition hover:text-[#c9153d]"
-          onClick={(event) => event.stopPropagation()}
-        >
-          {label}
-        </a>
-      );
-    } else if (match[0]) {
-      pushText(match[0]);
-    }
-
-    lastIndex = linkRegex.lastIndex;
-  }
-
-  if (lastIndex < value.length) {
-    pushText(value.slice(lastIndex));
-  }
-
-  return nodes;
 }
 
 export function ArtistModal({ artist, onClose }: ArtistModalProps) {
@@ -139,11 +83,6 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
                   <h2 className="text-3xl font-extrabold tracking-[-0.04em] text-[#1a1a1a]">
                     {artist.name}
                   </h2>
-                  {artist.is_ad && (
-                    <span className="rounded-full border border-[#FFD740] bg-[#FFF8E1] px-3 py-0.5 text-[10px] font-bold text-[#7A5800]">
-                      AD
-                    </span>
-                  )}
                 </div>
                 <p className="text-sm text-[#a0a0a0]">{artist.genre} 작가</p>
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -169,19 +108,11 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
                 </div>
               </div>
 
-              {artist.memo.trim() && (
-                <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#fffaf3] px-4 py-4">
-                  <p className="text-[11px] text-[#a0a0a0]">메모</p>
-                  <p className="mt-2 text-sm leading-6 text-[#1a1a1a]">
-                    {renderMemoWithLinks(artist.memo)}
-                  </p>
-                </div>
-              )}
             </div>
 
             <TrackedArtistActionLink
               artistId={artist.id}
-              eventType="instagram_click"
+              eventType="instagram_outbound"
               href={`https://instagram.com/${artist.instagram_handle.replace(/^@/, "")}`}
               className="inline-flex items-center justify-center rounded-full bg-[#ff4d6d] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#e83a5a]"
             >
@@ -199,7 +130,7 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
                   />
                   <TrackedArtistActionLink
                     artistId={artist.id}
-                    eventType="embed_click"
+                    eventType="instagram_outbound"
                     href={url}
                     className="inline-flex items-center rounded-full border border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-sm font-semibold text-[#6b6b6b] transition hover:border-[#ff4d6d] hover:text-[#ff4d6d]"
                   >

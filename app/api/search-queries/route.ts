@@ -48,9 +48,9 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { message: getErrorMessage(error, "검색어 기록에 실패했습니다.") },
+      { message: "검색어 기록에 실패했습니다." },
       { status: 500 }
     );
   }

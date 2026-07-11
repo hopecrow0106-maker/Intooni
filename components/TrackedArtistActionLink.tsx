@@ -2,19 +2,21 @@
 
 import type { PropsWithChildren, MouseEventHandler } from "react";
 
-import type { ArtistEventType } from "@/lib/artist-events";
+import type { DisplayArtistEventType } from "@/lib/artist-events";
 
 type TrackedArtistActionLinkProps = PropsWithChildren<{
   artistId: string;
-  eventType: ArtistEventType;
+  eventType: DisplayArtistEventType;
   href: string;
   className?: string;
   target?: string;
   rel?: string;
+  title?: string;
+  "aria-label"?: string;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
 }>;
 
-function trackArtistEvent(artistId: string, eventType: ArtistEventType) {
+function trackArtistEvent(artistId: string, eventType: DisplayArtistEventType) {
   void fetch("/api/artist-events", {
     method: "POST",
     headers: {
@@ -32,6 +34,8 @@ export function TrackedArtistActionLink({
   className,
   target = "_blank",
   rel = "noreferrer",
+  title,
+  "aria-label": ariaLabel,
   onClick,
   children
 }: TrackedArtistActionLinkProps) {
@@ -40,6 +44,8 @@ export function TrackedArtistActionLink({
       href={href}
       target={target}
       rel={rel}
+      title={title}
+      aria-label={ariaLabel}
       className={className}
       onClick={(event) => {
         trackArtistEvent(artistId, eventType);
@@ -50,4 +56,3 @@ export function TrackedArtistActionLink({
     </a>
   );
 }
-

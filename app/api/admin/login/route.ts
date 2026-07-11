@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 
 import {
   ADMIN_COOKIE_NAME,
+  ADMIN_SESSION_MAX_AGE_SECONDS,
   checkLoginRateLimit,
   clearLoginAttempts,
+  createAdminSessionToken,
   getAdminPassword,
   getClientIp,
   recordFailedLoginAttempt
@@ -43,12 +45,12 @@ export async function POST(request: Request) {
 
     cookies().set({
       name: ADMIN_COOKIE_NAME,
-      value: "authenticated",
+      value: createAdminSessionToken(),
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 12
+      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS
     });
 
     return NextResponse.json({ success: true });

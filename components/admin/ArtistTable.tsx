@@ -23,110 +23,83 @@ type ArtistTableProps = {
   statsPeriod: ArtistStatsPeriod;
   onEdit: (artist: Artist) => void;
   onDelete: (artist: Artist) => void;
-  onToggleAd: (artist: Artist) => void;
-  onToggleHot: (artist: Artist) => void;
+  onToggleTrending: (artist: Artist) => void;
   onReorder: (artists: Artist[]) => void;
   isSaving: boolean;
   reorderEnabled?: boolean;
 };
 
-const STALE_DAYS = 14;
-
 function reorderList(items: Artist[], startIndex: number, endIndex: number) {
   const nextItems = [...items];
   const [removed] = nextItems.splice(startIndex, 1);
   nextItems.splice(endIndex, 0, removed);
-  return nextItems.map((artist, index) => ({
-    ...artist,
-    sort_order: index
-  }));
+  return nextItems.map((artist, index) => ({ ...artist, sort_order: index }));
 }
 
-function formatUpdatedDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "기록 없음";
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-}
-
-function isStale(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return true;
-  }
-
-  return Date.now() - date.getTime() > STALE_DAYS * 24 * 60 * 60 * 1000;
-}
-
-function isToonbtiDataMissing(artist: Artist) {
-  return (
-    artist.mood_tags.length === 0 ||
-    artist.episode_formats.length === 0 ||
-    artist.style_tags.length === 0 ||
-    artist.topic_tags.length === 0
-  );
-}
-
-function isHiddenTagsMissing(artist: Artist) {
-  return artist.hidden_tags.map((tag) => tag.trim()).filter(Boolean).length === 0;
-}
-
-function isCharacterImageMissing(artist: Artist) {
-  return artist.character_url.trim().length === 0;
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("ko-KR", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 function getPeriodLabel(period: ArtistStatsPeriod) {
-  switch (period) {
-    case "day":
-      return "오늘";
-    case "week":
-      return "7일";
-    case "year":
-      return "1년";
-    case "all":
-    default:
-      return "전체";
-  }
+  if (period === "day") return "오늘";
+  if (period === "week") return "7일";
+  if (period === "year") return "1년";
+  return "전체";
 }
 
-function getStatsTotal(stats: ArtistStatsSummary) {
+function getStatusStyle(status: Artist["status"]) {
+  if (status === "active") return "bg-emerald-50 text-emerald-700";
+  if (status === "hidden") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-500";
+}
+
+function getStatusLabel(status: Artist["status"]) {
+  if (status === "active") return "활성";
+  if (status === "hidden") return "숨김";
+  return "보관";
+}
+
+function DataBadges({ artist }: { artist: Artist }) {
+  const missingSearchTags = artist.search_tags.map((tag) => tag.trim()).filter(Boolean).length === 0;
+  const missingCharacter = !artist.character_url.trim();
+
+  if (!missingSearchTags && !missingCharacter) {
+    return <span className="text-xs font-medium text-emerald-600">정상</span>;
+  }
+
   return (
-    stats.profile_click +
-    stats.instagram_click +
-    stats.embed_click +
-    stats.hero_click +
-    stats.toonbti_result_click +
-    stats.toonbti_character_click +
-    stats.random_click
+    <div className="flex flex-wrap gap-1">
+      {missingSearchTags ? (
+        <span className="rounded bg-orange-50 px-1.5 py-1 text-[11px] font-semibold text-orange-700">
+          검색 태그 누락
+        </span>
+      ) : null}
+      {missingCharacter ? (
+        <span className="rounded bg-sky-50 px-1.5 py-1 text-[11px] font-semibold text-sky-700">
+          캐릭터 PNG 누락
+        </span>
+      ) : null}
+    </div>
   );
 }
 
-function ToggleRow({
-  label,
-  active,
-  onClick
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function MiniSwitch({ active, label, onClick }: { active: boolean; label: string; onClick?: () => void }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-medium text-slate-500">{label}</span>
-      <button
-        type="button"
-        onClick={onClick}
-        className={`switch-track ${active ? "bg-slate-900" : "bg-slate-300"}`}
-      >
-        <span className={`switch-thumb ${active ? "translate-x-6" : "translate-x-1"}`} />
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={`relative h-5 w-9 rounded-full transition ${
+        active ? "bg-blue-600" : "bg-slate-300"
+      } ${onClick ? "cursor-pointer" : "cursor-default"}`}
+    >
+      <span
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+          active ? "left-[18px]" : "left-0.5"
+        }`}
+      />
+    </button>
   );
 }
 
@@ -136,174 +109,158 @@ export function ArtistTable({
   statsPeriod,
   onEdit,
   onDelete,
-  onToggleAd,
-  onToggleHot,
+  onToggleTrending,
   onReorder,
   isSaving,
   reorderEnabled = true
 }: ArtistTableProps) {
   const [localArtists, setLocalArtists] = useState(artists);
 
-  useEffect(() => {
-    setLocalArtists(artists);
-  }, [artists]);
-
-  const openInstagramProfile = (handle: string) => {
-    const normalizedHandle = handle.replace(/^@/, "").trim();
-    if (!normalizedHandle) {
-      return;
-    }
-
-    window.open(`https://www.instagram.com/${normalizedHandle}/`, "_blank", "noopener,noreferrer");
-  };
+  useEffect(() => setLocalArtists(artists), [artists]);
 
   const handleDragEnd = (result: DropResult) => {
-    if (!reorderEnabled) {
-      return;
-    }
-
-    if (!result.destination) {
-      return;
-    }
-
+    if (!reorderEnabled || !result.destination) return;
     const nextArtists = reorderList(localArtists, result.source.index, result.destination.index);
     setLocalArtists(nextArtists);
     onReorder(nextArtists);
   };
 
-  return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <Droppable droppableId="artist-table">
-        {(provided) => (
-          <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
-            {localArtists.map((artist, index) => {
-              const stats = statsByArtistId[artist.id] ?? {
-                artist_id: artist.id,
-                ...EMPTY_ARTIST_STATS
-              };
-              const statsTotal = getStatsTotal(stats);
+  const openInstagramProfile = (handle: string) => {
+    const normalizedHandle = handle.replace(/^@/, "").trim();
+    if (normalizedHandle) {
+      window.open(`https://www.instagram.com/${normalizedHandle}/`, "_blank", "noopener,noreferrer");
+    }
+  };
 
-              return (
-                <Draggable
-                  key={artist.id}
-                  draggableId={artist.id}
-                  index={index}
-                  isDragDisabled={!reorderEnabled}
-                >
-                  {(dragProvided) => (
-                    <div
-                      ref={dragProvided.innerRef}
-                      {...dragProvided.draggableProps}
-                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div
-                          {...dragProvided.dragHandleProps}
-                          className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ${
-                            reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""
-                          }`}
-                          title={reorderEnabled ? "드래그해서 순서 변경" : "최신순 페이지 목록"}
-                        >
-                          <Image
-                            src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
-                            alt={artist.name}
-                            fill
-                            className="object-cover"
-                            sizes="64px"
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="hidden grid-cols-[minmax(230px,1.5fr)_minmax(150px,0.8fr)_88px_90px_90px_minmax(150px,1fr)_110px_210px] items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-500 xl:grid">
+        <span>작가</span>
+        <span>계정 · 카테고리</span>
+        <span>상태</span>
+        <span>사이트 공개</span>
+        <span>요즘 뜨는 작가</span>
+        <span>데이터 상태</span>
+        <span>{getPeriodLabel(statsPeriod)} 반응</span>
+        <span className="text-right">관리</span>
+      </div>
+
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="artist-table">
+          {(provided) => (
+            <div ref={provided.innerRef} {...provided.droppableProps} className="divide-y divide-slate-100">
+              {localArtists.map((artist, index) => {
+                const stats = statsByArtistId[artist.id] ?? {
+                  artist_id: artist.id,
+                  ...EMPTY_ARTIST_STATS
+                };
+                const statsTotal = stats.artist_click + stats.instagram_outbound;
+
+                return (
+                  <Draggable
+                    key={artist.id}
+                    draggableId={artist.id}
+                    index={index}
+                    isDragDisabled={!reorderEnabled}
+                  >
+                    {(dragProvided) => (
+                      <div
+                        ref={dragProvided.innerRef}
+                        {...dragProvided.draggableProps}
+                        className="grid gap-3 px-4 py-3 transition hover:bg-slate-50 xl:grid-cols-[minmax(230px,1.5fr)_minmax(150px,0.8fr)_88px_90px_90px_minmax(150px,1fr)_110px_210px] xl:items-center"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            {...dragProvided.dragHandleProps}
+                            className={`relative h-11 w-11 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 ${
+                              reorderEnabled ? "cursor-grab" : ""
+                            }`}
+                          >
+                            <Image
+                              src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
+                              alt={artist.name}
+                              fill
+                              className="object-cover"
+                              sizes="44px"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-ink">{artist.name}</p>
+                            <div className="mt-1 flex flex-wrap gap-1 xl:hidden">
+                              <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${getStatusStyle(artist.status)}`}>
+                                {getStatusLabel(artist.status)}
+                              </span>
+                              {artist.is_trending ? (
+                                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">성장 공개</span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 text-xs">
+                          <p className="truncate font-medium text-slate-600">@{artist.instagram_handle}</p>
+                          <p className="mt-1 truncate text-slate-400">{artist.genre || "카테고리 없음"}</p>
+                        </div>
+
+                        <div className="hidden xl:block">
+                          <span className={`rounded px-2 py-1 text-xs font-semibold ${getStatusStyle(artist.status)}`}>
+                            {getStatusLabel(artist.status)}
+                          </span>
+                        </div>
+
+                        <div className="hidden xl:block">
+                          <MiniSwitch active={artist.status === "active" && artist.show_on_site === true} label="사이트 공개 상태" />
+                        </div>
+
+                        <div className="hidden xl:block">
+                          <MiniSwitch
+                            active={artist.is_trending}
+                            label="요즘 뜨는 작가 전환"
+                            onClick={() => onToggleTrending(artist)}
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <div>
-                            <p className="font-semibold text-ink">{artist.name}</p>
-                            <p className="text-sm text-slate-500">
-                              {artist.genre} · @{artist.instagram_handle}
-                            </p>
-                          </div>
+                        <div><DataBadges artist={artist} /></div>
 
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-slate-500">
-                              통계 업데이트 {formatUpdatedDate(artist.last_stats_updated_at)}
-                            </span>
-                            {isStale(artist.last_stats_updated_at) ? (
-                              <span className="rounded-md bg-amber-100 px-2.5 py-1 font-semibold text-amber-700">
-                                업데이트 필요
-                              </span>
-                            ) : null}
-                            {artist.hide_from_new ? (
-                              <span className="rounded-md bg-slate-200 px-2.5 py-1 font-semibold text-slate-600">
-                                NEW 제외
-                              </span>
-                            ) : null}
-                            {isToonbtiDataMissing(artist) ? (
-                              <span className="rounded-md bg-red-100 px-2.5 py-1 font-semibold text-red-600">
-                                툰비티아이 데이터 누락!
-                              </span>
-                            ) : null}
-                            {isHiddenTagsMissing(artist) ? (
-                              <span className="rounded-md bg-orange-100 px-2.5 py-1 font-semibold text-orange-700">
-                                숨김태그 누락!
-                              </span>
-                            ) : null}
-                            {isCharacterImageMissing(artist) ? (
-                              <span className="rounded-md bg-sky-100 px-2.5 py-1 font-semibold text-sky-700">
-                                누끼 PNG 누락!
-                              </span>
-                            ) : null}
-                          </div>
+                        <div className="text-xs">
+                          <p className="font-bold text-slate-700">{formatNumber(statsTotal)}</p>
+                          <p className="mt-0.5 text-slate-400">클릭 {formatNumber(stats.artist_click)}</p>
+                        </div>
 
-                          <div className="flex flex-wrap gap-2 text-xs">
-                            <span className="rounded-md bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
-                              {getPeriodLabel(statsPeriod)} 총 반응 {statsTotal}
-                            </span>
-                            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-slate-500">
-                              상세 통계는 수정/정보에서 확인
-                            </span>
-                          </div>
+                        <div className="flex flex-wrap items-center gap-1.5 xl:justify-end">
+                          <button
+                            type="button"
+                            onClick={() => onEdit(artist)}
+                            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-700"
+                          >
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openInstagramProfile(artist.instagram_handle)}
+                            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:border-slate-400"
+                          >
+                            인스타그램
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => onDelete(artist)}
+                            className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            보관
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                        <ToggleRow label="광고" active={artist.is_ad} onClick={() => onToggleAd(artist)} />
-                        <ToggleRow
-                          label="요즘 뜨는 작가"
-                          active={artist.is_hot}
-                          onClick={() => onToggleHot(artist)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => openInstagramProfile(artist.instagram_handle)}
-                          className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-ink"
-                        >
-                          인스타 열기
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onEdit(artist)}
-                          className="rounded-lg border border-ink px-3.5 py-2 text-sm font-semibold text-ink transition hover:bg-ink hover:text-white"
-                        >
-                          수정/정보
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(artist)}
-                          className="rounded-lg border border-red-200 px-3.5 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-50"
-                        >
-                          삭제
-                        </button>
-                        {isSaving ? (
-                          <span className="text-xs font-medium text-slate-400">저장 중...</span>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-                </Draggable>
-              );
-            })}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
-    </DragDropContext>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
+    </div>
   );
 }

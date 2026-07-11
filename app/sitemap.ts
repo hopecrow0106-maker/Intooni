@@ -1,13 +1,13 @@
 import type { MetadataRoute } from "next";
 
+import { listPublicArtists } from "@/lib/server/public-artists";
+import { CANONICAL_SITE_URL } from "@/lib/site";
 import { getSupabasePublicServerClient } from "@/lib/supabase";
-
-const SITE_URL = "https://intooni.com";
 
 export const dynamic = "force-dynamic";
 
 function absoluteUrl(path: string) {
-  return new URL(path, SITE_URL).toString();
+  return new URL(path, CANONICAL_SITE_URL).toString();
 }
 
 function getArtistSlug(artist: { id: string; instagram_handle: string }) {
@@ -40,17 +40,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const supabase = getSupabasePublicServerClient();
-    const [{ data: artists }, { data: magazines }] = await Promise.all([
-      supabase.from("artists").select("id, instagram_handle, created_at"),
+    const [artists, { data: magazines }] = await Promise.all([
+      listPublicArtists(),
       supabase
         .from("magazines")
         .select("id, published_at, created_at")
         .eq("is_public", true)
     ]);
 
-    const artistRoutes: MetadataRoute.Sitemap = (artists ?? []).map((artist) => ({
+    const artistRoutes: MetadataRoute.Sitemap = artists.map((artist) => ({
       url: absoluteUrl(`/artists/${getArtistSlug(artist)}`),
-      lastModified: artist.created_at ? new Date(artist.created_at) : now,
+      lastModified: artist.updated_at
+        ? new Date(artist.updated_at)
+        : artist.created_at
+          ? new Date(artist.created_at)
+          : now,
       changeFrequency: "weekly",
       priority: 0.6
     }));

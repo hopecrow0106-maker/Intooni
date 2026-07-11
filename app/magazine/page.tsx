@@ -1,21 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { getSupabasePublicServerClient } from "@/lib/supabase";
+import { listPublicMagazines } from "@/lib/server/public-magazines";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function MagazineListPage() {
-  const supabase = getSupabasePublicServerClient();
-  const { data: magazines } = await supabase
-    .from("magazines")
-    .select("*")
-    .eq("is_public", true)
-    .order("published_at", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  const items = magazines ?? [];
+  const items = await listPublicMagazines().catch(() => []);
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-5 py-10 md:px-8 md:py-14">

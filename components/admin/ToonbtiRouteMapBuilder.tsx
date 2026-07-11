@@ -1,55 +1,21 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import type {
+  ToonRouteDraft as RouteDraft,
+  ToonRouteNode as RouteNode,
+  ToonRouteOption as RouteOption
+} from "@/lib/domain/toon-test";
 import type { Artist } from "@/lib/types";
-
-type RouteNodeType = "question" | "result";
-type SelectionMode = "single" | "multi";
-
-type RouteNode = {
-  id: string;
-  type: RouteNodeType;
-  title: string;
-  description: string;
-  x: number;
-  y: number;
-  selectionMode?: SelectionMode;
-  maxSelections?: number;
-  imageUrl?: string;
-  traits?: string;
-  artistIds?: string[];
-};
-
-type RouteOption = {
-  id: string;
-  questionId: string;
-  label: string;
-  actionNote: string;
-  includeTags: string;
-  excludeTags: string;
-  includeTone?: string;
-  excludeTone?: string;
-  includePace?: string;
-  excludePace?: string;
-  includeStyle?: string;
-  excludeStyle?: string;
-  includeTopic?: string;
-  excludeTopic?: string;
-  nextNodeId: string;
-};
-
-type RouteDraft = {
-  startNodeId: string;
-  nodes: RouteNode[];
-  options: RouteOption[];
-};
+type RouteNodeType = RouteNode["type"];
+type SelectionMode = NonNullable<RouteNode["selectionMode"]>;
 
 type ToonbtiRouteMapBuilderProps = {
   artists: Artist[];
 };
 
-const STORAGE_KEY = "intooni.toonbti.route-map-draft.v1";
 const BASE_NODE_WIDTH = 240;
 const BASE_NODE_HEIGHT = 132;
 const CANVAS_WIDTH = 1800;
@@ -149,40 +115,45 @@ export function ToonbtiRouteMapBuilder({ artists }: ToonbtiRouteMapBuilderProps)
   const [cardScale, setCardScale] = useState(1);
   const [mapZoom, setMapZoom] = useState(0.9);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [testTitle, setTestTitle] = useState("툰비티아이");
+  const [testStatus, setTestStatus] = useState<"draft" | "published">("draft");
+  const [saveState, setSaveState] = useState<"idle" | "loading" | "saving" | "error" | "unavailable">("loading");
+  const [saveMessage, setSaveMessage] = useState("");
 
   const nodeWidth = Math.round(BASE_NODE_WIDTH * cardScale);
   const nodeHeight = Math.round(BASE_NODE_HEIGHT * cardScale);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (!saved) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(saved) as RouteDraft;
-      parsed.options = parsed.options.map((option) => ({
-        ...option,
-        includeTone: option.includeTone ?? option.includeTags ?? "",
-        excludeTone: option.excludeTone ?? option.excludeTags ?? "",
-        includePace: option.includePace ?? "",
-        excludePace: option.excludePace ?? "",
-        includeStyle: option.includeStyle ?? "",
-        excludeStyle: option.excludeStyle ?? "",
-        includeTopic: option.includeTopic ?? "",
-        excludeTopic: option.excludeTopic ?? ""
-      }));
-      setDraft(parsed);
-      setSelectedNodeId(parsed.startNodeId || parsed.nodes[0]?.id || "");
-      setTestNodeId(parsed.startNodeId || parsed.nodes[0]?.id || "");
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
+    let active = true;
+    void fetch("/api/admin/toon-tests", { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json()) as {
+          test?: { title?: string; status?: "draft" | "published"; draft?: RouteDraft } | null;
+          storageAvailable?: boolean;
+          message?: string;
+        };
+        if (!response.ok) throw new Error(data.message ?? "테스트를 불러오지 못했습니다.");
+        if (!active) return;
+        const loadedDraft = data.test?.draft;
+        if (loadedDraft) {
+          setDraft(loadedDraft);
+          setTestTitle(data.test?.title ?? "툰비티아이");
+          setTestStatus(data.test?.status ?? "draft");
+          setSelectedNodeId(loadedDraft.startNodeId || loadedDraft.nodes[0]?.id || "");
+          setTestNodeId(loadedDraft.startNodeId || loadedDraft.nodes[0]?.id || "");
+        }
+        setSaveState(data.storageAvailable === false ? "unavailable" : "idle");
+        setSaveMessage(data.message ?? "");
+      })
+      .catch((error) => {
+        if (!active) return;
+        setSaveState("error");
+        setSaveMessage(error instanceof Error ? error.message : "테스트를 불러오지 못했습니다.");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  }, [draft]);
 
   const selectedNode = useMemo(
     () => draft.nodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -386,6 +357,34 @@ export function ToonbtiRouteMapBuilder({ artists }: ToonbtiRouteMapBuilderProps)
     }
   };
 
+  const saveDraft = async (status: "draft" | "published") => {
+    if (saveState === "unavailable") {
+      setSaveMessage("DB 마이그레이션 후 저장과 발행을 사용할 수 있습니다.");
+      return;
+    }
+
+    setSaveState("saving");
+    setSaveMessage("");
+    try {
+      const response = await fetch("/api/admin/toon-tests", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: testTitle, status, draft })
+      });
+      const data = (await response.json()) as {
+        test?: { status?: "draft" | "published" };
+        message?: string;
+      };
+      if (!response.ok) throw new Error(data.message ?? "테스트 저장에 실패했습니다.");
+      setTestStatus(data.test?.status ?? status);
+      setSaveState("idle");
+      setSaveMessage(status === "published" ? "발행되었습니다." : "초안이 저장되었습니다.");
+    } catch (error) {
+      setSaveState("error");
+      setSaveMessage(error instanceof Error ? error.message : "테스트 저장에 실패했습니다.");
+    }
+  };
+
   const resetTest = () => {
     setTestNodeId(draft.startNodeId || draft.nodes[0]?.id || "");
     setTestSelectedOptions([]);
@@ -497,16 +496,41 @@ export function ToonbtiRouteMapBuilder({ artists }: ToonbtiRouteMapBuilderProps)
       <div className="panel-surface px-6 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-coral">ToonBTI Route Map · 개발용</p>
+            <p className="text-sm font-medium text-coral">
+              ToonBTI Route Map · {testStatus === "published" ? "발행됨" : "초안"}
+            </p>
             <h2 className="mt-2 font-[var(--font-display)] text-3xl font-semibold text-ink">
               질문지 설정 및 루트맵
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-              공개 툰비티아이에는 아직 반영하지 않는 관리자 전용 초안입니다. 질문/결과 카드를
-              드래그하고, 선택지에서 다음 질문이나 결과로 연결해 테스트 흐름을 확인할 수 있습니다.
-            </p>
+            <input
+              value={testTitle}
+              onChange={(event) => setTestTitle(event.target.value)}
+              aria-label="테스트 제목"
+              className="mt-3 w-full max-w-xl rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-ink"
+            />
+            {saveMessage ? (
+              <p className={`mt-2 text-sm ${saveState === "error" ? "text-red-600" : saveState === "unavailable" ? "text-amber-700" : "text-slate-500"}`}>
+                {saveMessage}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saveState === "loading" || saveState === "saving" || saveState === "unavailable"}
+              onClick={() => void saveDraft("draft")}
+              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:text-slate-300"
+            >
+              {saveState === "saving" ? "저장 중" : "초안 저장"}
+            </button>
+            <button
+              type="button"
+              disabled={saveState === "loading" || saveState === "saving" || saveState === "unavailable"}
+              onClick={() => void saveDraft("published")}
+              className="rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              발행
+            </button>
             <button
               type="button"
               onClick={() => addNode("question")}
@@ -891,11 +915,16 @@ export function ToonbtiRouteMapBuilder({ artists }: ToonbtiRouteMapBuilderProps)
                       <span className="text-sm font-medium text-slate-600">결과 이미지</span>
                       <div className="overflow-hidden rounded-[20px] border border-dashed border-slate-200 bg-slate-50">
                         {selectedNode.imageUrl ? (
-                          <img
-                            src={selectedNode.imageUrl}
-                            alt={selectedNode.title}
-                            className="h-auto max-h-[320px] w-full object-contain"
-                          />
+                          <div className="relative h-[320px] w-full">
+                            <Image
+                              src={selectedNode.imageUrl}
+                              alt={selectedNode.title}
+                              fill
+                              unoptimized
+                              sizes="(max-width: 1024px) 100vw, 480px"
+                              className="object-contain"
+                            />
+                          </div>
                         ) : (
                           <div className="flex min-h-40 items-center justify-center text-sm text-slate-400">
                             업로드한 비율 그대로 표시됩니다.
@@ -1014,11 +1043,16 @@ export function ToonbtiRouteMapBuilder({ artists }: ToonbtiRouteMapBuilderProps)
                 <p className="text-sm font-bold text-coral">결과</p>
                 <h4 className="text-2xl font-black text-ink">{testNode.title}</h4>
                 {testNode.imageUrl ? (
-                  <img
-                    src={testNode.imageUrl}
-                    alt={testNode.title}
-                    className="h-auto max-h-[360px] w-full rounded-[24px] border border-slate-100 object-contain"
-                  />
+                  <div className="relative h-[360px] w-full overflow-hidden rounded-[24px] border border-slate-100">
+                    <Image
+                      src={testNode.imageUrl}
+                      alt={testNode.title}
+                      fill
+                      unoptimized
+                      sizes="(max-width: 1024px) 100vw, 480px"
+                      className="object-contain"
+                    />
+                  </div>
                 ) : null}
                 <p className="text-sm leading-6 text-slate-600">{testNode.description}</p>
                 {testNode.traits ? (

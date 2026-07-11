@@ -3,6 +3,7 @@
 import Image from "next/image";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
+import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
 import { ARTIST_SQUARE_PLACEHOLDER } from "@/lib/placeholders";
 import type { Artist } from "@/lib/types";
 
@@ -26,20 +27,30 @@ function formatSocialCount(value: number) {
 
 export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
   const fallbackInstagramUrl = artist.gallery_post_urls.find((url) => url.trim());
+  const detailHref = `/artists/${encodeURIComponent(artist.instagram_handle.replace(/^@/, "").trim())}`;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <article
       className="group relative w-full animate-fade-up overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white text-left opacity-0 transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(0,0,0,0.15)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
       style={{ animationDelay: `${index * 55}ms`, animationFillMode: "forwards" }}
     >
-      {artist.is_ad ? (
-        <span className="absolute right-2.5 top-2.5 z-10 rounded-full border border-[#FFD740] bg-[#FFF8E1] px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-[#7A5800]">
-          AD
-        </span>
-      ) : null}
-
+      <button
+        type="button"
+        onClick={onClick}
+        className="absolute inset-0 z-10 cursor-pointer"
+        aria-label={`${artist.name} 미리보기`}
+      />
+      <TrackedArtistActionLink
+        artistId={artist.id}
+        eventType="artist_click"
+        href={detailHref}
+        target="_self"
+        className="absolute right-3 top-3 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/95 text-[#1a1a1a] shadow-sm transition hover:border-[#ff4d6d] hover:text-[#c9153d]"
+        aria-label={`${artist.name} 상세 페이지`}
+        title="상세 페이지"
+      >
+        <span aria-hidden="true" className="text-lg leading-none">↗</span>
+      </TrackedArtistActionLink>
       {artist.thumbnail_url ? (
         <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
           <Image
@@ -98,6 +109,6 @@ export function ArtistCard({ artist, index, onClick }: ArtistCardProps) {
           </span>
         </div>
       </div>
-    </button>
+    </article>
   );
 }

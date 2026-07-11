@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 
 import { ArtistForm, type ArtistFormValues } from "@/components/admin/ArtistForm";
 import { ArtistTable } from "@/components/admin/ArtistTable";
+import { GrowthAnalyticsDashboard } from "@/components/admin/GrowthAnalyticsDashboard";
 import { MagazineForm, type MagazineFormValues } from "@/components/admin/MagazineForm";
 import { MagazineTable } from "@/components/admin/MagazineTable";
 import { ToonbtiRouteMapBuilder } from "@/components/admin/ToonbtiRouteMapBuilder";
-import { ToonbtiTagManager } from "@/components/admin/ToonbtiTagManager";
 import {
   type ArtistStatsPeriod,
   type ArtistStatsSummary
 } from "@/lib/artist-events";
 import type { Artist, Category, Magazine } from "@/lib/types";
+import type { AdminGrowthAnalytics } from "@/lib/domain/admin-growth-analytics";
 
 type DebugError = {
   action: string;
@@ -22,7 +23,38 @@ type DebugError = {
   message: string;
 };
 
-type AdminTab = "artists" | "magazines" | "toonbti" | "statistics";
+type AdminSheetImportTarget =
+  | "categories"
+  | "brand_categories"
+  | "artists"
+  | "artist_stats"
+  | "artist_contacts"
+  | "artist_collaborations"
+  | "artist_b2b_profiles";
+type GeneralAdminSheetImportTarget = Exclude<AdminSheetImportTarget, "artist_stats">;
+type SheetOperation =
+  | "export"
+  | "previewGeneral"
+  | "applyGeneral"
+  | "previewArtistStats"
+  | "applyArtistStats";
+
+type SheetOperationStatus = {
+  tone: "success" | "error";
+  title: string;
+  message: string;
+  summary?: Record<string, unknown>;
+};
+type SheetPreviewDisplayRow = {
+  rowNumber: number;
+  status: "CREATE" | "UPDATE" | "NO_CHANGE" | "CONFLICT" | "ERROR";
+  record?: Record<string, unknown> | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  errors?: string[];
+};
+
+type AdminTab = "artists" | "magazines" | "toonbti" | "statistics" | "data";
 
 type SearchQuerySummary = {
   query: string;
@@ -34,13 +66,8 @@ type ArtistChartItem = {
   id: string;
   name: string;
   total: number;
-  profile_click: number;
-  instagram_click: number;
-  embed_click: number;
-  hero_click: number;
-  toonbti_result_click: number;
-  toonbti_character_click: number;
-  random_click: number;
+  artist_click: number;
+  instagram_outbound: number;
 };
 
 type MagazineChartItem = {
@@ -49,11 +76,18 @@ type MagazineChartItem = {
   views: number;
 };
 
-type ToonbtiFieldKey = "mood_tags" | "episode_formats" | "style_tags" | "topic_tags";
 type ArtistEventMetricKey = Exclude<keyof ArtistChartItem, "id" | "name" | "total">;
 
 const ADMIN_ARTISTS_PER_PAGE = 20;
 const ARTIST_STATS_STALE_DAYS = 14;
+const GENERAL_SHEET_TARGETS: Array<{ value: GeneralAdminSheetImportTarget; label: string }> = [
+  { value: "artists", label: "작가 기본정보 (artists)" },
+  { value: "categories", label: "작가 카테고리 (categories)" },
+  { value: "brand_categories", label: "브랜드 카테고리 (brand_categories)" },
+  { value: "artist_contacts", label: "연락정보 (artist_contacts)" },
+  { value: "artist_collaborations", label: "협업 이력 (artist_collaborations)" },
+  { value: "artist_b2b_profiles", label: "B2B 분석 (artist_b2b_profiles)" }
+];
 
 const ADMIN_NAV_ITEMS: Array<{
   key: AdminTab;
@@ -73,12 +107,17 @@ const ADMIN_NAV_ITEMS: Array<{
   {
     key: "toonbti",
     label: "툰비티아이 관리",
-    description: "추천 로직과 태그"
+    description: "질문·결과 루트맵"
   },
   {
     key: "statistics",
     label: "통계",
     description: "운영 성과와 검색 흐름"
+  },
+  {
+    key: "data",
+    label: "데이터 연동",
+    description: "Google Sheets 검토·일괄 반영"
   }
 ];
 
@@ -89,46 +128,16 @@ const ARTIST_EVENT_METRICS: Array<{
   surface: string;
 }> = [
   {
-    key: "profile_click",
+    key: "artist_click",
     label: "전체 클릭",
     color: "#2563eb",
     surface: "bg-blue-50 text-blue-700"
   },
   {
-    key: "instagram_click",
+    key: "instagram_outbound",
     label: "인스타 이동",
     color: "#db2777",
     surface: "bg-rose-50 text-rose-700"
-  },
-  {
-    key: "embed_click",
-    label: "임베드 이동",
-    color: "#0891b2",
-    surface: "bg-cyan-50 text-cyan-700"
-  },
-  {
-    key: "hero_click",
-    label: "홈 캐릭터",
-    color: "#ca8a04",
-    surface: "bg-yellow-50 text-yellow-700"
-  },
-  {
-    key: "toonbti_result_click",
-    label: "결과",
-    color: "#059669",
-    surface: "bg-emerald-50 text-emerald-700"
-  },
-  {
-    key: "toonbti_character_click",
-    label: "캐릭터",
-    color: "#7c3aed",
-    surface: "bg-violet-50 text-violet-700"
-  },
-  {
-    key: "random_click",
-    label: "랜덤 추천",
-    color: "#0284c7",
-    surface: "bg-sky-50 text-sky-700"
   }
 ];
 
@@ -239,6 +248,23 @@ async function requestMagazines() {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ko-KR").format(value);
+}
+
+async function requestGrowthAnalytics() {
+  const response = await fetch("/api/admin/statistics/growth", { cache: "no-store" });
+  const data = (await response.json()) as { analytics?: AdminGrowthAnalytics; message?: string };
+  if (!response.ok || !data.analytics) {
+    return {
+      data: null,
+      error: {
+        action: "성장 통계 조회",
+        source: "app/admin/page.tsx > requestGrowthAnalytics",
+        endpoint: "/api/admin/statistics/growth",
+        message: data.message ?? "성장 통계를 불러오지 못했습니다."
+      } satisfies DebugError
+    };
+  }
+  return { data: data.analytics, error: null as DebugError | null };
 }
 
 function isStatsStale(value: string) {
@@ -392,7 +418,7 @@ function ArtistStatsChart({
           </h3>
         </div>
         <p className="text-sm text-slate-500">
-          카드/인스타/임베드/홈 캐릭터/툰비티아이/랜덤 추천 클릭을 구분합니다.
+          작가 클릭과 인스타그램 외부 이동 두 지표만 집계합니다.
         </p>
       </div>
 
@@ -573,6 +599,232 @@ function CompletionMeter({
   );
 }
 
+function getSheetOperationButtonClass(disabled: boolean, primary = false) {
+  if (primary) {
+    return `rounded-lg px-3 py-2 text-sm font-semibold transition ${
+      disabled
+        ? "cursor-not-allowed bg-slate-300 text-white"
+        : "bg-slate-900 text-white hover:bg-slate-700"
+    }`;
+  }
+
+  return `rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+    disabled
+      ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300"
+      : "border-slate-200 bg-white text-slate-600 hover:border-ink hover:text-ink"
+  }`;
+}
+
+function formatSheetSummaryValue(value: unknown) {
+  if (typeof value === "number") {
+    return formatNumber(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+
+  if (typeof value === "string") {
+    return value || "-";
+  }
+
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  return JSON.stringify(value);
+}
+
+function AdminSheetsPanel({
+  busyOperation,
+  status,
+  previewRows,
+  onRun
+}: {
+  busyOperation: SheetOperation | null;
+  status: SheetOperationStatus | null;
+  previewRows: SheetPreviewDisplayRow[];
+  onRun: (operation: SheetOperation, target?: GeneralAdminSheetImportTarget) => void;
+}) {
+  const isBusy = busyOperation !== null;
+  const [selectedTarget, setSelectedTarget] = useState<GeneralAdminSheetImportTarget>("artists");
+  const selectedTargetLabel =
+    GENERAL_SHEET_TARGETS.find((target) => target.value === selectedTarget)?.label ?? selectedTarget;
+
+  return (
+    <section className="mt-4 space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Google Sheets</p>
+          <h3 className="mt-1 text-xl font-semibold text-ink">대량 데이터 검토 및 반영</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Google Sheets는 운영 DB를 직접 대신하는 저장소가 아니라, 여러 행을 한꺼번에
+            검토하고 수정하기 위한 작업 공간입니다. 시트의 변경 내용은 자동 반영되지 않습니다.
+          </p>
+        </div>
+
+        <ol className="mt-5 grid gap-3 md:grid-cols-3">
+          {[
+            ["1", "시트로 내보내기", "현재 Supabase 데이터를 Google Sheets에 복사합니다."],
+            ["2", "변경 미리보기", "시트 행을 검사하고 생성·수정·충돌 여부를 보여줍니다."],
+            ["3", "검증 후 반영", "오류가 없는 행만 확인을 거쳐 Supabase에 적용합니다."]
+          ].map(([step, title, body]) => (
+            <li key={step} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">{step}</span>
+              <p className="mt-3 text-sm font-bold text-ink">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{body}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h4 className="text-base font-bold text-ink">기본정보 일괄 작업</h4>
+          <p className="mt-1 text-sm text-slate-500">대상을 선택한 뒤 반드시 미리보기를 먼저 실행하세요.</p>
+          <label className="mt-4 block space-y-2">
+            <span className="text-xs font-semibold text-slate-500">작업할 데이터</span>
+            <select
+              value={selectedTarget}
+              disabled={isBusy}
+              onChange={(event) => setSelectedTarget(event.target.value as GeneralAdminSheetImportTarget)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500"
+            >
+              {GENERAL_SHEET_TARGETS.map((target) => (
+                <option key={target.value} value={target.value}>{target.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => onRun("export")}
+            className={getSheetOperationButtonClass(isBusy, true)}
+          >
+            {busyOperation === "export" ? "내보내는 중..." : "전체 데이터를 시트로 내보내기"}
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => onRun("previewGeneral", selectedTarget)}
+            className={getSheetOperationButtonClass(isBusy)}
+          >
+            {busyOperation === "previewGeneral" ? "검사 중..." : `${selectedTargetLabel} 미리보기`}
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => onRun("applyGeneral", selectedTarget)}
+            className={getSheetOperationButtonClass(isBusy)}
+          >
+            {busyOperation === "applyGeneral" ? "반영 중..." : "검증된 변경 반영"}
+          </button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 shadow-sm">
+          <h4 className="text-base font-bold text-amber-950">통계 이력 수동 작업</h4>
+          <p className="mt-2 text-sm leading-6 text-amber-800">
+            작가 ID와 기록일이 같은 통계는 갱신됩니다. 과거 통계 보정이나 명시적인 수동
+            입력에만 사용하세요.
+          </p>
+          <div className="mt-4 grid gap-2">
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => onRun("previewArtistStats")}
+            className={getSheetOperationButtonClass(isBusy)}
+          >
+            {busyOperation === "previewArtistStats" ? "검사 중..." : "통계 이력 미리보기"}
+          </button>
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={() => onRun("applyArtistStats")}
+            className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 transition hover:border-amber-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+          >
+            {busyOperation === "applyArtistStats" ? "반영 중..." : "통계 이력 반영"}
+          </button>
+          </div>
+        </div>
+      </div>
+
+      {status ? (
+        <div
+          className={`mt-3 rounded-lg border px-4 py-3 text-sm ${
+            status.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : status.message.includes("GOOGLE_SHEETS_ENABLED")
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          <p className="font-semibold">{status.title}</p>
+          <p className="mt-1">{status.message}</p>
+          {status.summary ? (
+            <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.entries(status.summary).map(([key, value]) => (
+                <div key={key} className="rounded-md bg-white/70 px-3 py-2">
+                  <dt className="text-[11px] font-semibold uppercase text-slate-500">{key}</dt>
+                  <dd className="mt-1 font-bold text-ink">{formatSheetSummaryValue(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+        </div>
+      ) : null}
+
+      {previewRows.length > 0 ? (
+        <div className="mt-4 max-h-[420px] overflow-auto border-t border-slate-200 pt-3">
+          <table className="w-full min-w-[860px] border-collapse text-left text-xs">
+            <thead className="sticky top-0 bg-slate-100 text-slate-600">
+              <tr>
+                <th className="px-3 py-2 font-semibold">Row</th>
+                <th className="px-3 py-2 font-semibold">Status</th>
+                <th className="px-3 py-2 font-semibold">Identifier</th>
+                <th className="px-3 py-2 font-semibold">Errors</th>
+                <th className="px-3 py-2 font-semibold">Before / after</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {previewRows.map((row) => {
+                const record = row.record ?? {};
+                const identifier =
+                  record.artist_id ??
+                  record.category_id ??
+                  record.collaboration_id ??
+                  record.name ??
+                  "new row";
+                return (
+                  <tr key={`${row.rowNumber}-${row.status}`} className="align-top">
+                    <td className="px-3 py-2 font-mono text-slate-500">{row.rowNumber}</td>
+                    <td className="px-3 py-2 font-semibold text-ink">{row.status}</td>
+                    <td className="max-w-[220px] break-all px-3 py-2 text-slate-700">
+                      {String(identifier)}
+                    </td>
+                    <td className="max-w-[260px] px-3 py-2 text-red-700">
+                      {(row.errors ?? []).join("; ") || "-"}
+                    </td>
+                    <td className="max-w-[440px] px-3 py-2">
+                      <details>
+                        <summary className="cursor-pointer font-semibold text-slate-600">View</summary>
+                        <pre className="mt-2 whitespace-pre-wrap break-all rounded bg-slate-50 p-2 text-[11px] leading-5 text-slate-600">
+                          {JSON.stringify({ before: row.before ?? null, after: row.after ?? row.record ?? null }, null, 2)}
+                        </pre>
+                      </details>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>("artists");
@@ -589,6 +841,7 @@ export default function AdminPage() {
   const [debugErrors, setDebugErrors] = useState<DebugError[]>([]);
   const [artistStats, setArtistStats] = useState<Record<string, ArtistStatsSummary>>({});
   const [searchQueries, setSearchQueries] = useState<SearchQuerySummary[]>([]);
+  const [growthAnalytics, setGrowthAnalytics] = useState<AdminGrowthAnalytics | null>(null);
   const [statsPeriod, setStatsPeriod] = useState<ArtistStatsPeriod>("all");
   const [artistSearch, setArtistSearch] = useState("");
   const [showAllArtistStats, setShowAllArtistStats] = useState(false);
@@ -597,8 +850,19 @@ export default function AdminPage() {
   const [showSearchStatsPanel, setShowSearchStatsPanel] = useState(false);
   const [artistPage, setArtistPage] = useState(1);
   const [showHiddenTagMissingOnly, setShowHiddenTagMissingOnly] = useState(false);
-  const [showToonbtiMissingOnly, setShowToonbtiMissingOnly] = useState(false);
   const [showCharacterMissingOnly, setShowCharacterMissingOnly] = useState(false);
+  const [visibilityFilter, setVisibilityFilter] = useState<"all" | "public" | "private">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden" | "archived">("all");
+  const [growthFilter, setGrowthFilter] = useState<"all" | "public" | "private">("all");
+  const [trendingFilter, setTrendingFilter] = useState<"all" | "yes" | "no">("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [internalDataFilter, setInternalDataFilter] = useState<
+    "all" | "missing" | "has_contact" | "no_contact" | "has_collaboration" | "no_collaboration" | "has_b2b" | "no_b2b"
+  >("all");
+  const [sheetOperation, setSheetOperation] = useState<SheetOperation | null>(null);
+  const [sheetOperationStatus, setSheetOperationStatus] =
+    useState<SheetOperationStatus | null>(null);
+  const [sheetPreviewRows, setSheetPreviewRows] = useState<SheetPreviewDisplayRow[]>([]);
 
   const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -646,6 +910,12 @@ export default function AdminPage() {
   const fetchSearchQueries = useCallback(async (period: ArtistStatsPeriod) => {
     const result = await requestSearchQueries(period);
     setSearchQueries(result.data);
+    return result.error;
+  }, []);
+
+  const fetchGrowthAnalytics = useCallback(async () => {
+    const result = await requestGrowthAnalytics();
+    setGrowthAnalytics(result.data);
     return result.error;
   }, []);
 
@@ -722,7 +992,16 @@ export default function AdminPage() {
         current.filter((item) => item.endpoint !== "/api/search-queries")
       );
     });
-  }, [authenticated, fetchArtistStats, fetchSearchQueries, statsPeriod]);
+    void fetchGrowthAnalytics().then((error) => {
+      if (error) {
+        pushDebugError(error);
+        return;
+      }
+      setDebugErrors((current) =>
+        current.filter((item) => item.endpoint !== "/api/admin/statistics/growth")
+      );
+    });
+  }, [authenticated, fetchArtistStats, fetchGrowthAnalytics, fetchSearchQueries, statsPeriod]);
 
   const persistArtist = async (payload: ArtistFormValues) => {
     setSaving(true);
@@ -790,114 +1069,8 @@ export default function AdminPage() {
     }
   };
 
-  const bulkUpdateToonbtiTag = async (
-    field: ToonbtiFieldKey,
-    from: string,
-    to: string
-  ) => {
-    const source = from.trim();
-    const target = to.trim();
-
-    if (!source || !target || source === target) {
-      return;
-    }
-
-    const matchedArtists = artists.filter((artist) => artist[field].includes(source));
-    if (matchedArtists.length === 0) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await Promise.all(
-        matchedArtists.map(async (artist) => {
-          const nextValues = artist[field].map((item) => (item === source ? target : item));
-          const deduped = [...new Set(nextValues.filter(Boolean))];
-
-          const response = await fetch("/api/artists", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...artist,
-              [field]: deduped
-            })
-          });
-
-          const data = (await response.json()) as { message?: string };
-          if (!response.ok) {
-            throw new Error(data.message ?? "툰비티아이 태그 일괄 수정에 실패했습니다.");
-          }
-        })
-      );
-
-      clearDebugErrors();
-      await fetchArtists();
-    } catch (error) {
-      pushDebugError({
-        action: "툰비티아이 태그 일괄 수정",
-        source: "app/admin/page.tsx > bulkUpdateToonbtiTag",
-        endpoint: "/api/artists",
-        message:
-          error instanceof Error ? error.message : "툰비티아이 태그 일괄 수정에 실패했습니다."
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const bulkDeleteToonbtiTag = async (field: ToonbtiFieldKey, value: string) => {
-    const source = value.trim();
-    if (!source) {
-      return;
-    }
-
-    const matchedArtists = artists.filter((artist) => artist[field].includes(source));
-    if (matchedArtists.length === 0) {
-      return;
-    }
-
-    const confirmed = window.confirm(`"${source}" 값을 전체 작가에서 삭제할까요?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await Promise.all(
-        matchedArtists.map(async (artist) => {
-          const response = await fetch("/api/artists", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...artist,
-              [field]: artist[field].filter((item) => item !== source)
-            })
-          });
-
-          const data = (await response.json()) as { message?: string };
-          if (!response.ok) {
-            throw new Error(data.message ?? "툰비티아이 태그 전체 삭제에 실패했습니다.");
-          }
-        })
-      );
-
-      clearDebugErrors();
-      await fetchArtists();
-    } catch (error) {
-      pushDebugError({
-        action: "툰비티아이 태그 전체 삭제",
-        source: "app/admin/page.tsx > bulkDeleteToonbtiTag",
-        endpoint: "/api/artists",
-        message:
-          error instanceof Error ? error.message : "툰비티아이 태그 전체 삭제에 실패했습니다."
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const deleteArtist = async (artist: Artist) => {
-    const confirmed = window.confirm(`${artist.name} 작가를 삭제할까요?`);
+    const confirmed = window.confirm(`${artist.name} 작가를 사이트에서 보관 처리할까요?`);
     if (!confirmed) {
       return;
     }
@@ -962,46 +1135,16 @@ export default function AdminPage() {
     }
   };
 
-  const toggleAd = async (artist: Artist) => {
+  const toggleTrending = async (artist: Artist) => {
+    const nextTrending = !artist.is_trending;
     setSaving(true);
     try {
       const response = await fetch("/api/artists", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...artist,
-          is_ad: !artist.is_ad
-        })
-      });
-
-      const data = (await response.json()) as { message?: string };
-
-      if (!response.ok) {
-        pushDebugError({
-          action: "AD 상태 변경",
-          source: "app/admin/page.tsx > toggleAd",
-          endpoint: "/api/artists",
-          message: data.message ?? "AD 상태 변경에 실패했습니다."
-        });
-        return;
-      }
-
-      clearDebugErrors();
-      await fetchArtists();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const toggleHot = async (artist: Artist) => {
-    setSaving(true);
-    try {
-      const response = await fetch("/api/artists", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...artist,
-          is_hot: !artist.is_hot
+          id: artist.id,
+          is_trending: nextTrending
         })
       });
 
@@ -1010,7 +1153,7 @@ export default function AdminPage() {
       if (!response.ok) {
         pushDebugError({
           action: "요즘 뜨는 작가 상태 변경",
-          source: "app/admin/page.tsx > toggleHot",
+          source: "app/admin/page.tsx > toggleTrending",
           endpoint: "/api/artists",
           message: data.message ?? "요즘 뜨는 작가 상태 변경에 실패했습니다."
         });
@@ -1059,6 +1202,121 @@ export default function AdminPage() {
     }
   };
 
+  const runSheetOperation = async (
+    operation: SheetOperation,
+    target: GeneralAdminSheetImportTarget = "artists"
+  ) => {
+    const configs: Record<
+      SheetOperation,
+      {
+        endpoint: string;
+        body?: { sheet: AdminSheetImportTarget };
+        title: string;
+        successMessage: string;
+      }
+    > = {
+      export: {
+        endpoint: "/api/admin/sheets/export",
+        title: "Sheets export complete",
+        successMessage: "Supabase admin data was written to the configured Google Sheet."
+      },
+      previewGeneral: {
+        endpoint: "/api/admin/sheets/import/preview",
+        body: { sheet: target },
+        title: `${target} preview complete`,
+        successMessage: `${target} rows were validated without changing Supabase source data.`
+      },
+      applyGeneral: {
+        endpoint: "/api/admin/sheets/import/apply",
+        body: { sheet: target },
+        title: `${target} import applied`,
+        successMessage: `Validated ${target} rows were applied to Supabase.`
+      },
+      previewArtistStats: {
+        endpoint: "/api/admin/sheets/import/preview",
+        body: { sheet: "artist_stats" },
+        title: "artist_stats preview complete",
+        successMessage: "Stat rows were validated without changing Supabase."
+      },
+      applyArtistStats: {
+        endpoint: "/api/admin/sheets/import/apply",
+        body: { sheet: "artist_stats" },
+        title: "artist_stats import applied",
+        successMessage: "Validated stat rows were upserted to official artist_stats."
+      }
+    };
+
+    if (
+      operation === "applyArtistStats" &&
+      !window.confirm(
+        "Apply artist_stats rows to official Supabase stats? This upserts by artist_id + recorded_date."
+      )
+    ) {
+      return;
+    }
+
+    if (
+      operation === "applyGeneral" &&
+      !window.confirm(`Apply validated ${target} rows from Google Sheets to Supabase?`)
+    ) {
+      return;
+    }
+
+    const config = configs[operation];
+    setSheetOperation(operation);
+    setSheetOperationStatus(null);
+
+    try {
+      const response = await fetch(config.endpoint, {
+        method: "POST",
+        headers: config.body ? { "Content-Type": "application/json" } : undefined,
+        body: config.body ? JSON.stringify(config.body) : undefined
+      });
+      const data = (await response.json()) as {
+        message?: string;
+        summary?: Record<string, unknown>;
+        rows?: SheetPreviewDisplayRow[];
+      };
+
+      if (!response.ok) {
+        throw new Error(data.message ?? `${config.title} failed.`);
+      }
+
+      setSheetOperationStatus({
+        tone: "success",
+        title: config.title,
+        message: config.successMessage,
+        summary: data.summary
+      });
+      setSheetPreviewRows(operation.startsWith("preview") ? (data.rows ?? []) : []);
+      clearDebugErrors();
+
+      if (operation === "applyGeneral") {
+        await Promise.all([fetchArtists(), fetchCategories(), fetchArtistStats(statsPeriod)]);
+      }
+
+      if (operation === "applyArtistStats") {
+        await Promise.all([fetchArtistStats(statsPeriod), fetchGrowthAnalytics()]);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Google Sheets operation failed.";
+      setSheetOperationStatus({
+        tone: "error",
+        title: "Sheets operation failed",
+        message
+      });
+      pushDebugError({
+        action: "Google Sheets operation",
+        source: "app/admin/page.tsx > runSheetOperation",
+        endpoint: config.endpoint,
+        message
+      });
+    } finally {
+      setSheetOperation(null);
+    }
+  };
+
   const sortedArtists = useMemo(
     () =>
       [...artists].sort((a, b) => {
@@ -1079,22 +1337,47 @@ export default function AdminPage() {
 
     if (showHiddenTagMissingOnly) {
       baseArtists = baseArtists.filter(
-        (artist) => artist.hidden_tags.map((tag) => tag.trim()).filter(Boolean).length === 0
-      );
-    }
-
-    if (showToonbtiMissingOnly) {
-      baseArtists = baseArtists.filter(
-        (artist) =>
-          artist.mood_tags.length === 0 ||
-          artist.episode_formats.length === 0 ||
-          artist.style_tags.length === 0 ||
-          artist.topic_tags.length === 0
+        (artist) => artist.search_tags.map((tag) => tag.trim()).filter(Boolean).length === 0
       );
     }
 
     if (showCharacterMissingOnly) {
       baseArtists = baseArtists.filter((artist) => artist.character_url.trim().length === 0);
+    }
+
+    if (visibilityFilter !== "all") {
+      baseArtists = baseArtists.filter((artist) =>
+        visibilityFilter === "public"
+          ? artist.status === "active" && artist.show_on_site === true
+          : artist.status !== "active" || artist.show_on_site !== true
+      );
+    }
+    if (statusFilter !== "all") {
+      baseArtists = baseArtists.filter((artist) => artist.status === statusFilter);
+    }
+    if (growthFilter !== "all") {
+      baseArtists = baseArtists.filter((artist) =>
+        growthFilter === "public" ? artist.show_growth_on_site === true : artist.show_growth_on_site !== true
+      );
+    }
+    if (trendingFilter !== "all") {
+      baseArtists = baseArtists.filter((artist) => artist.is_trending === (trendingFilter === "yes"));
+    }
+    if (categoryFilter !== "all") {
+      baseArtists = baseArtists.filter((artist) => artist.main_category_id === categoryFilter);
+    }
+    if (internalDataFilter !== "all") {
+      baseArtists = baseArtists.filter((artist) => {
+        if (internalDataFilter === "missing") {
+          return !artist.last_stats_updated_at || !artist.search_tags.length || !artist.character_url.trim();
+        }
+        if (internalDataFilter === "has_contact") return artist.has_contact === true;
+        if (internalDataFilter === "no_contact") return artist.has_contact !== true;
+        if (internalDataFilter === "has_collaboration") return artist.has_collaboration === true;
+        if (internalDataFilter === "no_collaboration") return artist.has_collaboration !== true;
+        if (internalDataFilter === "has_b2b") return artist.has_b2b === true;
+        return artist.has_b2b !== true;
+      });
     }
 
     if (!query) {
@@ -1106,10 +1389,10 @@ export default function AdminPage() {
         artist.name,
         artist.instagram_handle,
         artist.genre,
-        artist.memo,
+        artist.internal_memo,
         artist.bio,
         ...artist.hashtags,
-        ...artist.hidden_tags
+        ...artist.search_tags
       ]
         .join(" ")
         .toLowerCase();
@@ -1118,28 +1401,21 @@ export default function AdminPage() {
     });
   }, [
     artistSearch,
+    categoryFilter,
+    growthFilter,
+    internalDataFilter,
     showCharacterMissingOnly,
     showHiddenTagMissingOnly,
-    showToonbtiMissingOnly,
+    statusFilter,
+    trendingFilter,
+    visibilityFilter,
     sortedArtists
   ]);
 
   const hiddenTagMissingCount = useMemo(
     () =>
       sortedArtists.filter(
-        (artist) => artist.hidden_tags.map((tag) => tag.trim()).filter(Boolean).length === 0
-      ).length,
-    [sortedArtists]
-  );
-
-  const toonbtiMissingCount = useMemo(
-    () =>
-      sortedArtists.filter(
-        (artist) =>
-          artist.mood_tags.length === 0 ||
-          artist.episode_formats.length === 0 ||
-          artist.style_tags.length === 0 ||
-          artist.topic_tags.length === 0
+        (artist) => artist.search_tags.map((tag) => tag.trim()).filter(Boolean).length === 0
       ).length,
     [sortedArtists]
   );
@@ -1154,9 +1430,14 @@ export default function AdminPage() {
   }, [
     artistSearch,
     activeTab,
+    categoryFilter,
+    growthFilter,
+    internalDataFilter,
     showCharacterMissingOnly,
     showHiddenTagMissingOnly,
-    showToonbtiMissingOnly
+    statusFilter,
+    trendingFilter,
+    visibilityFilter
   ]);
 
   const totalArtistPages = Math.max(1, Math.ceil(filteredSortedArtists.length / ADMIN_ARTISTS_PER_PAGE));
@@ -1190,36 +1471,19 @@ export default function AdminPage() {
             id: artist.id,
             name: artist.name,
             total: 0,
-            profile_click: 0,
-            instagram_click: 0,
-            embed_click: 0,
-            hero_click: 0,
-            toonbti_result_click: 0,
-            toonbti_character_click: 0,
-            random_click: 0
+            artist_click: 0,
+            instagram_outbound: 0
           };
         }
 
-        const total =
-          stats.profile_click +
-          stats.instagram_click +
-          stats.embed_click +
-          stats.hero_click +
-          stats.toonbti_result_click +
-          stats.toonbti_character_click +
-          stats.random_click;
+        const total = stats.artist_click + stats.instagram_outbound;
 
         return {
           id: artist.id,
           name: artist.name,
           total,
-          profile_click: stats.profile_click,
-          instagram_click: stats.instagram_click,
-          embed_click: stats.embed_click,
-          hero_click: stats.hero_click,
-          toonbti_result_click: stats.toonbti_result_click,
-          toonbti_character_click: stats.toonbti_character_click,
-          random_click: stats.random_click
+          artist_click: stats.artist_click,
+          instagram_outbound: stats.instagram_outbound
         };
       })
       .filter((item) => item.total > 0)
@@ -1270,13 +1534,8 @@ export default function AdminPage() {
       acc[metric.key] = allArtistChartItems.reduce((sum, item) => sum + item[metric.key], 0);
       return acc;
     }, {
-      profile_click: 0,
-      instagram_click: 0,
-      embed_click: 0,
-      hero_click: 0,
-      toonbti_result_click: 0,
-      toonbti_character_click: 0,
-      random_click: 0
+      artist_click: 0,
+      instagram_outbound: 0
     });
   }, [allArtistChartItems]);
 
@@ -1320,7 +1579,6 @@ export default function AdminPage() {
   const averageMagazineViews =
     sortedMagazines.length > 0 ? Math.round(totalMagazineViews / sortedMagazines.length) : 0;
 
-  const toonbtiReadyCount = Math.max(sortedArtists.length - toonbtiMissingCount, 0);
   const hiddenTagReadyCount = Math.max(sortedArtists.length - hiddenTagMissingCount, 0);
   const characterReadyCount = Math.max(sortedArtists.length - characterMissingCount, 0);
   const staleStatsCount = useMemo(
@@ -1500,14 +1758,7 @@ export default function AdminPage() {
                 onClick={() => setShowHiddenTagMissingOnly((current) => !current)}
                 className={getAdminControlClass(showHiddenTagMissingOnly)}
               >
-                숨김태그 누락만 {formatNumber(hiddenTagMissingCount)}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowToonbtiMissingOnly((current) => !current)}
-                className={getAdminControlClass(showToonbtiMissingOnly)}
-              >
-                툰비티아이 누락만 {formatNumber(toonbtiMissingCount)}
+                검색 태그 누락만 {formatNumber(hiddenTagMissingCount)}
               </button>
               <button
                 type="button"
@@ -1526,124 +1777,72 @@ export default function AdminPage() {
                 className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-ink"
               />
             </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-500">공개 여부</span>
+                <select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value as typeof visibilityFilter)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="all">전체</option><option value="public">공개</option><option value="private">비공개</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-500">관리 상태</span>
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="all">전체</option><option value="active">활성</option><option value="hidden">숨김</option><option value="archived">보관</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-500">성장률 공개</span>
+                <select value={growthFilter} onChange={(event) => setGrowthFilter(event.target.value as typeof growthFilter)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="all">전체</option><option value="public">공개</option><option value="private">비공개</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-500">요즘 뜨는 작가</span>
+                <select value={trendingFilter} onChange={(event) => setTrendingFilter(event.target.value as typeof trendingFilter)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="all">전체</option><option value="yes">설정</option><option value="no">미설정</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-500">카테고리</span>
+                <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="all">전체</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-500">내부 데이터</span>
+                <select value={internalDataFilter} onChange={(event) => setInternalDataFilter(event.target.value as typeof internalDataFilter)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="all">전체</option><option value="missing">데이터 누락</option><option value="has_contact">연락정보 있음</option><option value="no_contact">연락정보 없음</option><option value="has_collaboration">협업 있음</option><option value="no_collaboration">협업 없음</option><option value="has_b2b">B2B 있음</option><option value="no_b2b">B2B 없음</option>
+                </select>
+              </label>
+            </div>
           </section>
 
           <section className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             <StatsCard
-              label="전체 작가"
-              value={formatNumber(filteredSortedArtists.length)}
-              helper={
-                artistSearch.trim()
-                  ? `전체 ${formatNumber(sortedArtists.length)}명 중 검색 결과`
-                  : undefined
-              }
+              label="등록 작가"
+              value={formatNumber(sortedArtists.length)}
+              helper={`현재 검색 결과 ${formatNumber(filteredSortedArtists.length)}명`}
             />
             <StatsCard
-              label={`${getStatsPeriodLabel(statsPeriod)} 총 반응`}
-              value={formatNumber(totalArtistInteractions)}
-              helper="카드 클릭, 인스타 이동, 임베드 이동, 캐릭터 클릭 합산"
+              label="사이트 공개"
+              value={formatNumber(sortedArtists.filter((artist) => artist.status === "active" && artist.show_on_site).length)}
+              helper="활성 상태이며 공개 설정된 작가"
             />
             <StatsCard
-              label="광고 노출 작가"
-              value={formatNumber(sortedArtists.filter((artist) => artist.is_ad).length)}
+              label="내부 전용"
+              value={formatNumber(sortedArtists.filter((artist) => artist.status !== "active" || !artist.show_on_site).length)}
+              helper="숨김·보관 또는 사이트 비공개"
             />
             <StatsCard
-              label="카테고리 수"
-              value={formatNumber(categories.length)}
+              label="데이터 보강 필요"
+              value={formatNumber(new Set([
+                ...sortedArtists.filter((artist) => artist.search_tags.length === 0).map((artist) => artist.id),
+                ...sortedArtists.filter((artist) => !artist.character_url.trim()).map((artist) => artist.id)
+              ]).size)}
+              helper="검색 태그 또는 캐릭터 이미지 누락"
             />
           </section>
-
-          <div className="mt-6">
-            <ToggleSummaryPanel
-              eyebrow="Artist Stats"
-              title={`${getStatsPeriodLabel(statsPeriod)} 기준 상위 작가 반응`}
-              helper="커다란 차트는 필요할 때만 열어서 확인합니다."
-              summary={
-                topArtistChartItem
-                  ? `1위 ${topArtistChartItem.name} · ${formatNumber(topArtistChartItem.total)}`
-                  : "집계 없음"
-              }
-              open={showArtistStatsPanel}
-              onToggle={() => setShowArtistStatsPanel((current) => !current)}
-            >
-              <>
-                <ArtistStatsChart items={artistChartItems} period={statsPeriod} />
-                {allArtistChartItems.length > 5 ? (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setShowAllArtistStats((current) => !current)}
-                      className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-ink hover:text-ink"
-                    >
-                      {showAllArtistStats ? "상위 5개만 보기" : "전체 보기"}
-                    </button>
-                  </div>
-                ) : null}
-              </>
-            </ToggleSummaryPanel>
-          </div>
-
-          <div className="mt-6">
-            <ToggleSummaryPanel
-              eyebrow="Search Keywords"
-              title="사람들이 찾은 검색어"
-              helper="검색어 목록도 필요할 때만 열어서 확인합니다."
-              summary={
-                topSearchQuery
-                  ? `1위 "${topSearchQuery.query}" · ${formatNumber(topSearchQuery.count)}회`
-                  : "집계 없음"
-              }
-              open={showSearchStatsPanel}
-              onToggle={() => setShowSearchStatsPanel((current) => !current)}
-            >
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Search Keywords</p>
-                    <h3 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-ink">
-                      {getStatsPeriodLabel(statsPeriod)} 기준 상위 검색어
-                    </h3>
-                  </div>
-                  <p className="text-sm text-slate-500">총 {formatNumber(totalSearchCount)}회 검색</p>
-                </div>
-
-                {topSearchQueries.length === 0 ? (
-                  <div className="mt-5 rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-400">
-                    아직 기록된 검색어가 없습니다.
-                  </div>
-                ) : (
-                  <div className="mt-6">
-                    <RankedBarList
-                      items={topSearchQueries.map((item) => ({
-                        label: item.query,
-                        value: item.count,
-                        helper: `최근 검색 ${new Intl.DateTimeFormat("ko-KR", {
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        }).format(new Date(item.latest_at))}`,
-                        color: "#2563eb"
-                      }))}
-                      emptyLabel="아직 기록된 검색어가 없습니다."
-                    />
-                  </div>
-                )}
-
-                {searchQueries.length > 5 ? (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setShowAllSearchQueries((current) => !current)}
-                      className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-ink hover:text-ink"
-                    >
-                      {showAllSearchQueries ? "상위 5개만 보기" : "전체 보기"}
-                    </button>
-                  </div>
-                ) : null}
-              </section>
-            </ToggleSummaryPanel>
-          </div>
 
         </>
       ) : activeTab === "magazines" ? (
@@ -1691,6 +1890,13 @@ export default function AdminPage() {
             </section>
           </>
         )
+      ) : activeTab === "data" ? (
+        <AdminSheetsPanel
+          busyOperation={sheetOperation}
+          status={sheetOperationStatus}
+          previewRows={sheetPreviewRows}
+          onRun={runSheetOperation}
+        />
       ) : activeTab === "statistics" ? (
         <>
           <section className="mt-4 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
@@ -1711,6 +1917,8 @@ export default function AdminPage() {
             ))}
           </section>
 
+          {growthAnalytics ? <GrowthAnalyticsDashboard analytics={growthAnalytics} /> : null}
+
           <section className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             <StatsCard
               label="작가 총 반응"
@@ -1729,8 +1937,8 @@ export default function AdminPage() {
             />
             <StatsCard
               label="데이터 보강 필요"
-              value={formatNumber(hiddenTagMissingCount + toonbtiMissingCount + characterMissingCount)}
-              helper="숨김태그, 툰비티아이, 누끼 PNG 누락 합산"
+              value={formatNumber(hiddenTagMissingCount + characterMissingCount)}
+              helper="검색 태그와 누끼 PNG 누락 합산"
             />
           </section>
 
@@ -1825,22 +2033,15 @@ export default function AdminPage() {
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">ToonBTI Readiness</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Content Readiness</p>
                   <h3 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-ink">
-                    툰비티아이 관리 통계
+                    작가 콘텐츠 준비 상태
                   </h3>
                 </div>
                 <p className="text-sm text-slate-500">추천 품질에 필요한 데이터 완성도입니다.</p>
               </div>
 
               <div className="mt-5 grid gap-3">
-                <CompletionMeter
-                  label="툰비티아이 태그 완성"
-                  value={toonbtiReadyCount}
-                  total={sortedArtists.length}
-                  helper="톤, 포맷, 그림체, 주제 태그가 모두 있는 작가"
-                  color="#059669"
-                />
                 <CompletionMeter
                   label="숨김 검색 태그 준비"
                   value={hiddenTagReadyCount}
@@ -1934,17 +2135,6 @@ export default function AdminPage() {
       ) : (
         <section className="mt-6 space-y-6">
           <ToonbtiRouteMapBuilder artists={sortedArtists} />
-          <ToonbtiTagManager
-            artists={sortedArtists}
-            saving={saving}
-            onBulkReplace={bulkUpdateToonbtiTag}
-            onBulkDelete={bulkDeleteToonbtiTag}
-            onOpenArtist={(artist) => {
-              setActiveTab("artists");
-              setSelectedArtist(artist);
-              setArtistFormOpen(true);
-            }}
-          />
         </section>
       )}
 
@@ -2001,8 +2191,7 @@ export default function AdminPage() {
                 setArtistFormOpen(true);
               }}
               onDelete={deleteArtist}
-              onToggleAd={toggleAd}
-              onToggleHot={toggleHot}
+              onToggleTrending={toggleTrending}
               onReorder={reorderArtists}
               isSaving={saving}
               reorderEnabled={false}

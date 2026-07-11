@@ -6,6 +6,7 @@ import {
   ARTIST_EVENT_TYPES,
   EMPTY_ARTIST_STATS,
   getArtistStatsThreshold,
+  normalizeArtistEventType,
   type ArtistEventType,
   type ArtistStatsPeriod,
   type ArtistStatsSummary
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdminClient();
     const { error } = await supabase.from("artist_event_logs").insert({
       artist_id: artistId,
-      event_type: eventType
+      event_type: normalizeArtistEventType(eventType)
     });
 
     if (error) {
@@ -44,9 +45,9 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { message: getErrorMessage(error, "작가 이벤트 기록에 실패했습니다.") },
+      { message: "작가 이벤트 기록에 실패했습니다." },
       { status: 500 }
     );
   }
@@ -94,7 +95,8 @@ export async function GET(request: Request) {
           ...EMPTY_ARTIST_STATS
         };
 
-        current[item.event_type] += 1;
+        const normalizedEventType = normalizeArtistEventType(item.event_type as ArtistEventType);
+        current[normalizedEventType] += 1;
         byArtist.set(item.artist_id, current);
       });
 

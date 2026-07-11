@@ -14,6 +14,9 @@ dist
 out
 *.tsbuildinfo
 .next-dev*.log
+/.dev-server-*.log
+/backups/
+/.codex-logs/
 
 .vercel
 .env*

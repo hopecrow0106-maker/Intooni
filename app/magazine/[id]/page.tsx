@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 
 import { GoogleAd } from "@/components/GoogleAd";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
+import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
 import { ADSENSE_SLOTS } from "@/lib/adsense";
+import type { PublicArtistDTO } from "@/lib/domain/public-artist";
 import {
   getMagazineContentStats,
   parseMagazineContent,
@@ -15,8 +17,8 @@ import {
   type TextBlockFont
 } from "@/lib/magazine-content";
 import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/placeholders";
+import { listPublicArtistsByIds } from "@/lib/server/public-artists";
 import { getSupabaseAdminClient, getSupabasePublicServerClient } from "@/lib/supabase";
-import type { Artist } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,9 +29,24 @@ type MagazineDetailPageProps = {
   };
 };
 
-function sortArtistsByIds(artists: Artist[], ids: string[]) {
+function sortArtistsByIds(artists: PublicArtistDTO[], ids: string[]) {
   const orderMap = new Map(ids.map((id, index) => [id, index]));
   return [...artists].sort((a, b) => (orderMap.get(a.id) ?? 999) - (orderMap.get(b.id) ?? 999));
+}
+
+async function getRelatedArtistIds(
+  adminSupabase: ReturnType<typeof getSupabaseAdminClient>,
+  magazineId: string
+) {
+  const { data, error } = await (adminSupabase as any)
+    .from("magazine_artists")
+    .select("artist_id, sort_order")
+    .eq("magazine_id", magazineId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? [])
+    .map((row: { artist_id?: string | null }) => row.artist_id)
+    .filter((artistId: string | null | undefined): artistId is string => Boolean(artistId));
 }
 
 function getArtistSlug(artist: { id: string; instagram_handle: string }) {
@@ -116,7 +133,9 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
 
   const { data: magazine, error: magazineError } = await publicSupabase
     .from("magazines")
-    .select("*")
+    .select(
+      "id, title, tag, content, thumbnail_url, instagram_urls, view_count, published_at, created_at"
+    )
     .eq("id", params.id)
     .eq("is_public", true)
     .single();
@@ -130,14 +149,10 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
     .update({ view_count: magazine.view_count + 1 })
     .eq("id", params.id);
 
-  let relatedArtists: Artist[] = [];
-  if (magazine.related_artist_ids.length > 0) {
-    const { data: artists } = await publicSupabase
-      .from("artists")
-      .select("*")
-      .in("id", magazine.related_artist_ids);
-
-    relatedArtists = sortArtistsByIds(artists ?? [], magazine.related_artist_ids);
+  const relatedArtistIds = await getRelatedArtistIds(adminSupabase, magazine.id);
+  let relatedArtists: PublicArtistDTO[] = [];
+  if (relatedArtistIds.length > 0) {
+    relatedArtists = sortArtistsByIds(await listPublicArtistsByIds(relatedArtistIds), relatedArtistIds);
   }
 
   const contentBlocks = parseMagazineContent(magazine.content);
@@ -327,9 +342,12 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
               <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#1a1a1a]">관련 작가</h2>
               <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                 {relatedArtists.map((artist) => (
-                  <Link
+                  <TrackedArtistActionLink
                     key={artist.id}
+                    artistId={artist.id}
+                    eventType="artist_click"
                     href={`/artists/${getArtistSlug(artist)}`}
+                    target="_self"
                     className="overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white text-left transition hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(0,0,0,0.08)]"
                   >
                     <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
@@ -344,10 +362,10 @@ export default async function MagazineDetailPage({ params }: MagazineDetailPageP
                     <div className="space-y-1 px-4 pb-4 pt-3">
                       <p className="text-sm font-bold text-[#1a1a1a]">{artist.name}</p>
                       <p className="text-xs text-[#8a8a8a]">
-                        {artist.genre} · {formatFollowerCount(artist.followers)}
+                        {artist.category} · {formatFollowerCount(artist.stats.followers ?? 0)}
                       </p>
                     </div>
-                  </Link>
+                  </TrackedArtistActionLink>
                 ))}
               </div>
             </section>

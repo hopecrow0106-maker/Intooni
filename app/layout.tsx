@@ -5,7 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 
 import "@/app/globals.css";
 import { ADSENSE_ENABLED } from "@/lib/adsense";
-import { getSiteUrl, SITE_NAME } from "@/lib/site";
+import { getSiteUrl, isProductionDeployment, SITE_NAME } from "@/lib/site";
 
 const jakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -20,6 +20,7 @@ const notoKr = Noto_Sans_KR({
 });
 
 const siteUrl = getSiteUrl();
+const indexable = isProductionDeployment();
 const ogImageUrl = `${siteUrl}/intoonismall.png`;
 const defaultTitle = `${SITE_NAME} | 기억 안 나는 인스타툰 찾기`;
 const defaultDescription =
@@ -30,6 +31,20 @@ export const metadata: Metadata = {
   title: defaultTitle,
   description: defaultDescription,
   applicationName: SITE_NAME,
+  robots: indexable
+    ? {
+        index: true,
+        follow: true
+      }
+    : {
+        index: false,
+        follow: false,
+        nocache: true,
+        googleBot: {
+          index: false,
+          follow: false
+        }
+      },
   icons: {
     icon: [{ url: "/intoonismall.png", type: "image/png" }],
     shortcut: [{ url: "/intoonismall.png", type: "image/png" }],

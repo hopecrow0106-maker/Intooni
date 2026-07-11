@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { InstagramQuickImport } from "@/components/admin/InstagramQuickImport";
+import { ArtistInternalManager } from "@/components/admin/ArtistInternalManager";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import {
   EMPTY_ARTIST_STATS,
@@ -16,27 +17,21 @@ export type ArtistFormValues = {
   id?: string;
   name: string;
   instagram_handle: string;
-  genre: string;
-  followers: number;
-  post_count: number;
-  weekly_follower_growth: number;
-  weekly_post_growth: number;
-  weekly_follower_growth_rate: number;
-  weekly_post_growth_rate: number;
-  last_stats_updated_at: string;
+  main_category_id: string;
   hashtags: string[];
-  hidden_tags: string[];
+  search_tags: string[];
   mood_tags: string[];
-  episode_formats: string[];
   style_tags: string[];
   topic_tags: string[];
-  memo: string;
+  internal_memo: string;
   bio: string;
   thumbnail_url: string;
   character_url: string;
   gallery_post_urls: string[];
-  is_ad: boolean;
-  is_hot: boolean;
+  is_trending: boolean;
+  show_on_site: boolean;
+  show_growth_on_site: boolean;
+  status: "active" | "hidden" | "archived";
   hide_from_new: boolean;
   sort_order: number;
 };
@@ -58,11 +53,12 @@ type UploadingState = {
   character: boolean;
 };
 
+type ArtistEditorTab = "profile" | "media" | "internal";
+
 type TagFieldKey =
   | "hashtags"
-  | "hidden_tags"
+  | "search_tags"
   | "mood_tags"
-  | "episode_formats"
   | "style_tags"
   | "topic_tags";
 
@@ -74,46 +70,16 @@ const ARTIST_FORM_STATS_METRICS: Array<{
   chipClassName: string;
 }> = [
   {
-    key: "profile_click",
+    key: "artist_click",
     label: "전체 클릭",
     color: "#6d5efc",
     chipClassName: "bg-[#f4f0ff] text-[#5a43d6]"
   },
   {
-    key: "instagram_click",
+    key: "instagram_outbound",
     label: "인스타 이동",
     color: "#ff6f91",
     chipClassName: "bg-[#fff0f3] text-[#c9153d]"
-  },
-  {
-    key: "embed_click",
-    label: "임베드 이동",
-    color: "#59b4ff",
-    chipClassName: "bg-[#eef7ff] text-[#2b6cb0]"
-  },
-  {
-    key: "hero_click",
-    label: "홈 캐릭터",
-    color: "#ffbf47",
-    chipClassName: "bg-[#fff8e1] text-[#946200]"
-  },
-  {
-    key: "toonbti_result_click",
-    label: "결과",
-    color: "#34d399",
-    chipClassName: "bg-emerald-50 text-emerald-700"
-  },
-  {
-    key: "toonbti_character_click",
-    label: "캐릭터",
-    color: "#a78bfa",
-    chipClassName: "bg-violet-50 text-violet-700"
-  },
-  {
-    key: "random_click",
-    label: "랜덤 추천",
-    color: "#38bdf8",
-    chipClassName: "bg-sky-50 text-sky-700"
   }
 ];
 
@@ -139,51 +105,32 @@ function getStatsTotal(stats: ArtistStatsSummary) {
   return ARTIST_FORM_STATS_METRICS.reduce((sum, metric) => sum + stats[metric.key], 0);
 }
 
-function formatDateTimeLabel(value?: string) {
-  if (!value) {
-    return "기록 없음";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "기록 없음";
-  }
-
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-}
-
 function createInitialState(artist: Artist | null, categories: Category[]): ArtistFormValues {
   return {
     id: artist?.id,
     name: artist?.name ?? "",
     instagram_handle: artist?.instagram_handle ?? "",
-    genre: artist?.genre ?? categories[0]?.name ?? "",
-    followers: artist?.followers ?? 0,
-    post_count: artist?.post_count ?? 0,
-    weekly_follower_growth: artist?.weekly_follower_growth ?? 0,
-    weekly_post_growth: artist?.weekly_post_growth ?? 0,
-    weekly_follower_growth_rate: artist?.weekly_follower_growth_rate ?? 0,
-    weekly_post_growth_rate: artist?.weekly_post_growth_rate ?? 0,
-    last_stats_updated_at: artist?.last_stats_updated_at ?? new Date().toISOString(),
+    main_category_id:
+      artist?.main_category_id ??
+      categories.find((category) => category.name === artist?.genre)?.id ??
+      categories[0]?.id ??
+      "",
     hashtags: artist?.hashtags ?? [],
-    hidden_tags: artist?.hidden_tags ?? [],
+    search_tags: artist?.search_tags ?? [],
     mood_tags: artist?.mood_tags ?? [],
-    episode_formats: artist?.episode_formats ?? [],
     style_tags: artist?.style_tags ?? [],
     topic_tags: artist?.topic_tags ?? [],
-    memo: artist?.memo ?? "",
+    internal_memo: artist?.internal_memo ?? "",
     bio: artist?.bio ?? "",
     thumbnail_url: artist?.thumbnail_url ?? "",
     character_url: artist?.character_url ?? "",
     gallery_post_urls: artist?.gallery_post_urls.length
       ? [...artist.gallery_post_urls, ...EMPTY_GALLERY_POST_URLS].slice(0, 4)
       : [...EMPTY_GALLERY_POST_URLS],
-    is_ad: artist?.is_ad ?? false,
-    is_hot: artist?.is_hot ?? false,
+    is_trending: artist?.is_trending ?? false,
+    show_on_site: artist?.show_on_site ?? true,
+    show_growth_on_site: artist?.show_growth_on_site ?? true,
+    status: artist?.status ?? "active",
     hide_from_new: artist?.hide_from_new ?? false,
     sort_order: artist?.sort_order ?? 0
   };
@@ -275,7 +222,7 @@ function ArtistStatsBreakdown({
         <div>
           <p className="text-sm font-semibold text-slate-700">수정 및 정보 확인</p>
           <p className="mt-1 text-xs text-slate-400">
-            {getStatsPeriodLabel(period)} 기준 클릭/이동/추천 반응입니다.
+            {getStatsPeriodLabel(period)} 기준 작가 클릭과 인스타그램 외부 이동입니다.
           </p>
         </div>
         <span className="self-start rounded-full bg-[#f4f0ff] px-3 py-1.5 text-sm font-bold text-[#5a43d6]">
@@ -345,7 +292,6 @@ export function ArtistForm({
   const [tagInput, setTagInput] = useState("");
   const [hiddenTagInput, setHiddenTagInput] = useState("");
   const [moodInput, setMoodInput] = useState("");
-  const [episodeFormatInput, setEpisodeFormatInput] = useState("");
   const [styleInput, setStyleInput] = useState("");
   const [topicInput, setTopicInput] = useState("");
   const [uploading, setUploading] = useState<UploadingState>({
@@ -356,6 +302,7 @@ export function ArtistForm({
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryBusy, setCategoryBusy] = useState(false);
   const [formMessage, setFormMessage] = useState("");
+  const [editorTab, setEditorTab] = useState<ArtistEditorTab>("profile");
 
   useEffect(() => {
     const nextForm = createInitialState(initialArtist, categories);
@@ -364,18 +311,18 @@ export function ArtistForm({
     setTagInput("");
     setHiddenTagInput("");
     setMoodInput("");
-    setEpisodeFormatInput("");
     setStyleInput("");
     setTopicInput("");
     setFormMessage("");
+    setEditorTab("profile");
     setUploading({ thumbnail: false, character: false });
   }, [categories, initialArtist, isOpen]);
 
   useEffect(() => {
-    if (!form.genre && categories[0]?.name) {
-      setForm((current) => ({ ...current, genre: categories[0].name }));
+    if (!form.main_category_id && categories[0]?.id) {
+      setForm((current) => ({ ...current, main_category_id: categories[0].id }));
     }
-  }, [categories, form.genre]);
+  }, [categories, form.main_category_id]);
 
   if (!isOpen) {
     return null;
@@ -485,9 +432,9 @@ export function ArtistForm({
 
     setForm((current) => ({
       ...current,
-      hidden_tags: current.hidden_tags.includes(normalized)
-        ? current.hidden_tags
-        : [...current.hidden_tags, normalized]
+      search_tags: current.search_tags.includes(normalized)
+        ? current.search_tags
+        : [...current.search_tags, normalized]
     }));
     setHiddenTagInput("");
   };
@@ -532,14 +479,14 @@ export function ArtistForm({
         body: JSON.stringify(payload)
       });
 
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json()) as { id?: string; message?: string };
       if (!response.ok) {
         throw new Error(data.message ?? "카테고리 저장에 실패했습니다.");
       }
 
       await onCategoriesChanged();
-      if (!form.genre || (initialArtist && form.genre === initialArtist.genre)) {
-        setForm((current) => ({ ...current, genre: name }));
+      if (data.id) {
+        setForm((current) => ({ ...current, main_category_id: data.id ?? current.main_category_id }));
       }
       setCategoryInput("");
       setEditingCategoryId(null);
@@ -570,11 +517,11 @@ export function ArtistForm({
         throw new Error(data.message ?? "카테고리 삭제에 실패했습니다.");
       }
 
-      const fallbackGenre = categories.find((item) => item.id !== category.id)?.name ?? "";
+      const fallbackCategoryId = categories.find((item) => item.id !== category.id)?.id ?? "";
       await onCategoriesChanged();
 
-      if (form.genre === category.name) {
-        setForm((current) => ({ ...current, genre: fallbackGenre }));
+      if (form.main_category_id === category.id) {
+        setForm((current) => ({ ...current, main_category_id: fallbackCategoryId }));
       }
     } catch (error) {
       setFormMessage(error instanceof Error ? error.message : "카테고리 삭제에 실패했습니다.");
@@ -584,41 +531,77 @@ export function ArtistForm({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-ink/50">
+    <div className="fixed inset-0 z-50 bg-slate-100">
       <div
-        className="absolute inset-x-0 bottom-0 h-[94vh] overflow-y-auto rounded-t-[32px] bg-[#fffdf9] p-5 shadow-[0_-24px_70px_rgba(16,24,40,0.24)] md:left-auto md:right-6 md:top-6 md:h-auto md:max-h-[calc(100vh-3rem)] md:w-[720px] md:rounded-[32px] xl:w-[1120px]"
+        className="absolute inset-0 overflow-y-auto bg-slate-100"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-coral">Admin Form</p>
-            <h2 className="font-[var(--font-display)] text-2xl font-semibold text-ink">
-              {initialArtist ? "작가 수정" : "작가 추가"}
-            </h2>
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+                {form.thumbnail_url ? (
+                  <Image src={form.thumbnail_url} alt="" fill className="object-cover" sizes="48px" />
+                ) : null}
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="truncate text-xl font-bold text-ink">
+                    {form.name || (initialArtist ? "작가 수정" : "새 작가")}
+                  </h2>
+                  <span className={`rounded px-2 py-1 text-xs font-semibold ${form.status === "active" ? "bg-emerald-50 text-emerald-700" : form.status === "hidden" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                    {form.status === "active" ? "활성" : form.status === "hidden" ? "숨김" : "보관"}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-sm text-slate-500">
+                  @{form.instagram_handle || "instagram"} · {initialArtist ? "작가 정보 편집" : "새 작가 등록"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {editorTab !== "internal" ? (
+                <button
+                  type="submit"
+                  form={formId}
+                  disabled={isBusy || !form.main_category_id}
+                  className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isBusy ? "저장 중..." : "저장"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={requestClose}
+                className="rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:border-slate-400"
+              >
+                목록으로
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="submit"
-              form={formId}
-              disabled={isBusy || !form.genre}
-              className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white transition hover:bg-coral disabled:cursor-wait disabled:opacity-70"
-            >
-              {isBusy ? "저장 중.." : "저장하기"}
-            </button>
-            <button
-              type="button"
-              onClick={requestClose}
-              className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-600"
-            >
-              닫기
-            </button>
-          </div>
-        </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,720px)_minmax(300px,1fr)]">
+          <nav className="mx-auto flex max-w-[1600px] overflow-x-auto px-4 md:px-6">
+            {([
+              ["profile", "기본 정보", "프로필·공개 설정·태그"],
+              ["media", "미디어", "대표 이미지·캐릭터·게시물"],
+              ["internal", "내부 정보", "통계·연락처·협업·B2B"]
+            ] as const).map(([key, label, description]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setEditorTab(key)}
+                className={`min-w-max border-b-2 px-4 py-3 text-left transition ${editorTab === key ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+              >
+                <span className="block text-sm font-bold">{label}</span>
+                <span className="mt-0.5 hidden text-[11px] sm:block">{description}</span>
+              </button>
+            ))}
+          </nav>
+        </header>
+
+        <div className={`mx-auto max-w-[1600px] px-4 py-5 md:px-6 ${editorTab === "internal" ? "block" : "grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
           <form
             id={formId}
-            className="space-y-5"
+            className={editorTab === "internal" ? "hidden" : "space-y-5"}
             onSubmit={async (event) => {
               event.preventDefault();
               setFormMessage("");
@@ -627,12 +610,12 @@ export function ArtistForm({
                 ...form,
                 instagram_handle: form.instagram_handle.replace(/^@/, ""),
                 hashtags: form.hashtags.map((tag) => tag.trim()).filter(Boolean),
-                hidden_tags: form.hidden_tags.map((tag) => tag.trim()).filter(Boolean),
+                search_tags: form.search_tags.map((tag) => tag.trim()).filter(Boolean),
                 mood_tags: form.mood_tags.map((tag) => tag.trim()).filter(Boolean),
-                episode_formats: form.episode_formats.map((tag) => tag.trim()).filter(Boolean),
                 style_tags: form.style_tags.map((tag) => tag.trim()).filter(Boolean),
                 topic_tags: form.topic_tags.map((tag) => tag.trim()).filter(Boolean),
-                gallery_post_urls: form.gallery_post_urls.map((url) => url.trim()).filter(Boolean)
+                gallery_post_urls: form.gallery_post_urls.map((url) => url.trim()).filter(Boolean),
+                is_trending: form.is_trending
               });
             }}
           >
@@ -642,18 +625,16 @@ export function ArtistForm({
             </div>
           ) : null}
 
+          {editorTab === "profile" ? (
+          <div className="space-y-5">
           <InstagramQuickImport
             onApply={(values) => {
               setForm((current) => ({
                 ...current,
-                ...values,
                 name: values.name || current.name,
                 instagram_handle: values.instagram_handle || current.instagram_handle,
                 bio: values.bio || current.bio,
-                memo: values.memo || current.memo,
                 thumbnail_url: values.thumbnail_url || current.thumbnail_url,
-                followers: values.followers ?? current.followers,
-                post_count: values.post_count ?? current.post_count,
                 gallery_post_urls: values.gallery_post_urls
                   ? [...values.gallery_post_urls, "", "", "", ""].slice(0, 4)
                   : current.gallery_post_urls
@@ -695,26 +676,15 @@ export function ArtistForm({
             </label>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-600">요즘 뜨는 작가</span>
               <button
                 type="button"
-                onClick={() => setForm((current) => ({ ...current, is_hot: !current.is_hot }))}
-                className={`switch-track ${form.is_hot ? "bg-coral" : "bg-slate-300"}`}
+                onClick={() => setForm((current) => ({ ...current, is_trending: !current.is_trending }))}
+                className={`switch-track ${form.is_trending ? "bg-coral" : "bg-slate-300"}`}
               >
-                <span className={`switch-thumb ${form.is_hot ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">AD 상단 노출</span>
-              <button
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, is_ad: !current.is_ad }))}
-                className={`switch-track ${form.is_ad ? "bg-coral" : "bg-slate-300"}`}
-              >
-                <span className={`switch-thumb ${form.is_ad ? "translate-x-6" : "translate-x-1"}`} />
+                <span className={`switch-thumb ${form.is_trending ? "translate-x-6" : "translate-x-1"}`} />
               </button>
             </label>
 
@@ -732,19 +702,82 @@ export function ArtistForm({
             </label>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-600">관리 상태</span>
+              <select
+                value={form.status}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    status: event.target.value as ArtistFormValues["status"]
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
+              >
+                <option value="active">활성</option>
+                <option value="hidden">숨김</option>
+                <option value="archived">보관</option>
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-600">사이트 공개</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((current) => ({ ...current, show_on_site: !current.show_on_site }))
+                }
+                className={`switch-track ${form.show_on_site ? "bg-coral" : "bg-slate-300"}`}
+              >
+                <span className={`switch-thumb ${form.show_on_site ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-sm font-medium text-slate-600">성장 공개</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((current) => ({
+                    ...current,
+                    show_growth_on_site: !current.show_growth_on_site
+                  }))
+                }
+                className={`switch-track ${form.show_growth_on_site ? "bg-coral" : "bg-slate-300"}`}
+              >
+                <span
+                  className={`switch-thumb ${form.show_growth_on_site ? "translate-x-6" : "translate-x-1"}`}
+                />
+              </button>
+            </label>
+          </div>
+
+          <div className="grid gap-2 text-xs leading-5 text-slate-500 md:grid-cols-2">
+            <p className="rounded-lg bg-slate-100 px-3 py-2">
+              웹사이트 공개 OFF: 내부 DB에는 유지되지만 공개 사이트, 상세 페이지, 검색,
+              sitemap에서 제외됩니다.
+            </p>
+            <p className="rounded-lg bg-slate-100 px-3 py-2">
+              성장률 공개 OFF: 통계 수집은 계속되며 공개 사이트의 증가량과 증가율만 숨깁니다.
+            </p>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2">
               <span className="text-sm font-medium text-slate-600">카테고리</span>
               <select
-                value={form.genre}
-                onChange={(event) => setForm((current) => ({ ...current, genre: event.target.value }))}
+                value={form.main_category_id}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, main_category_id: event.target.value }))
+                }
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
               >
                 {categories.length === 0 ? (
                   <option value="">카테고리를 먼저 추가해 주세요</option>
                 ) : (
                   categories.map((category) => (
-                    <option key={category.id} value={category.name}>
+                    <option key={category.id} value={category.id}>
                       {category.name}
                     </option>
                   ))
@@ -814,129 +847,14 @@ export function ArtistForm({
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">팔로워 수</span>
-              <input
-                min={0}
-                type="number"
-                value={form.followers}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, followers: Number(event.target.value) }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">게시물 수</span>
-              <input
-                min={0}
-                type="number"
-                value={form.post_count}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, post_count: Number(event.target.value) }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">주간 팔로워 증가</span>
-              <input
-                min={0}
-                type="number"
-                value={form.weekly_follower_growth}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    weekly_follower_growth: Number(event.target.value)
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">주간 게시물 증가</span>
-              <input
-                min={0}
-                type="number"
-                value={form.weekly_post_growth}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    weekly_post_growth: Number(event.target.value)
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">주간 팔로워 증가율(%)</span>
-              <input
-                min={0}
-                step="0.01"
-                type="number"
-                value={form.weekly_follower_growth_rate}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    weekly_follower_growth_rate: Number(event.target.value)
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">주간 게시물 증가율(%)</span>
-              <input
-                min={0}
-                step="0.01"
-                type="number"
-                value={form.weekly_post_growth_rate}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    weekly_post_growth_rate: Number(event.target.value)
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
-            <div className="space-y-1">
-              <p className="font-medium text-slate-600">마지막 통계 업데이트</p>
-              <p className="text-slate-500">{formatDateTimeLabel(form.last_stats_updated_at)}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                setForm((current) => ({
-                  ...current,
-                  last_stats_updated_at: new Date().toISOString()
-                }))
-              }
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-ink hover:text-ink"
-            >
-              오늘로 갱신
-            </button>
-          </div>
-
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-600">메모</span>
+            <span className="text-sm font-medium text-slate-600">내부 운영 메모</span>
             <textarea
-              value={form.memo}
-              onChange={(event) => setForm((current) => ({ ...current, memo: event.target.value }))}
-              placeholder="작가 소개나 운영 메모를 적어주세요"
+              value={form.internal_memo}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, internal_memo: event.target.value }))
+              }
+              placeholder="공개되지 않는 운영 메모"
               rows={4}
               className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
             />
@@ -972,8 +890,8 @@ export function ArtistForm({
           />
 
           <TagSection
-            label="숨김 검색 태그"
-            helper="사용자에게는 보이지 않고 검색에만 들어갑니다. 예: 이지, 흑백, 그림 일기"
+            label="검색 태그"
+            helper="작가 검색에 사용하며 공개 API에 포함될 수 있습니다."
             inputValue={hiddenTagInput}
             onInputChange={setHiddenTagInput}
             onAdd={addHiddenTag}
@@ -986,8 +904,8 @@ export function ArtistForm({
                 addHiddenTag();
               }
             }}
-            tags={form.hidden_tags}
-            onRemove={(value) => removeArrayValue("hidden_tags", value)}
+            tags={form.search_tags}
+            onRemove={(value) => removeArrayValue("search_tags", value)}
             chipClassName="rounded-full border border-dashed border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-500"
           />
 
@@ -1009,30 +927,6 @@ export function ArtistForm({
             tags={form.mood_tags}
             onRemove={(value) => removeArrayValue("mood_tags", value)}
             chipClassName="rounded-full bg-[#fff0f3] px-3 py-1.5 text-sm text-[#c9153d]"
-          />
-
-          <TagSection
-            label="툰비티아이 에피소드 형식"
-            helper="예: 짧다, 중간, 길다"
-            inputValue={episodeFormatInput}
-            onInputChange={setEpisodeFormatInput}
-            onAdd={() =>
-              addArrayValue("episode_formats", episodeFormatInput, () => setEpisodeFormatInput(""))
-            }
-            onKeyDown={(event) => {
-              if (isKoreanComposing(event)) {
-                return;
-              }
-              if (event.key === "Enter") {
-                event.preventDefault();
-                addArrayValue("episode_formats", episodeFormatInput, () =>
-                  setEpisodeFormatInput("")
-                );
-              }
-            }}
-            tags={form.episode_formats}
-            onRemove={(value) => removeArrayValue("episode_formats", value)}
-            chipClassName="rounded-full bg-[#eef7ff] px-3 py-1.5 text-sm text-[#2b6cb0]"
           />
 
           <TagSection
@@ -1074,7 +968,11 @@ export function ArtistForm({
             onRemove={(value) => removeArrayValue("topic_tags", value)}
             chipClassName="rounded-full bg-[#fff8e1] px-3 py-1.5 text-sm text-[#946200]"
           />
+          </div>
+          ) : null}
 
+          {editorTab === "media" ? (
+          <div className="space-y-5">
           <div className="space-y-3">
             <span className="text-sm font-medium text-slate-600">대표 썸네일</span>
             <div className="grid gap-4 md:grid-cols-[180px_1fr]">
@@ -1189,39 +1087,54 @@ export function ArtistForm({
               ))}
             </div>
           </div>
+          </div>
+          ) : null}
 
-          <button
-            type="submit"
-            disabled={isBusy || !form.genre}
-            className="w-full rounded-full bg-ink px-5 py-4 text-sm font-semibold text-white transition hover:bg-coral disabled:cursor-wait disabled:opacity-70"
-          >
-            {isBusy ? "저장 중.." : "저장하기"}
-          </button>
           </form>
 
-          <aside className="hidden xl:block">
-            <div className="sticky top-0 space-y-3 rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-slate-700">통계 참고용 게시물</p>
-                <p className="text-xs leading-5 text-slate-400">
-                  갤러리 게시물 링크 1번을 옆에 고정해서 보여줍니다. 팔로워/게시물 수 수정할 때
-                  참고하세요.
-                </p>
-              </div>
-
-              {primaryPreviewUrl ? (
-                <InstagramEmbed
-                  url={primaryPreviewUrl}
-                  compact
-                  className="max-h-[340px] min-h-[220px] rounded-lg border border-slate-200 bg-white"
-                />
-              ) : (
-                <div className="flex min-h-[260px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-6 text-center text-sm leading-6 text-slate-400">
-                  갤러리 게시물 링크 1번을 입력하면 여기에 인스타 게시물이 표시됩니다.
+          {editorTab !== "internal" ? (
+            <aside className="hidden xl:block">
+              <div className="sticky top-[150px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-4 py-3">
+                  <p className="text-sm font-bold text-ink">
+                    {editorTab === "profile" ? "공개 프로필 미리보기" : "대표 게시물 미리보기"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">실제 공개 화면의 핵심 정보만 축약해 보여줍니다.</p>
                 </div>
-              )}
-            </div>
-          </aside>
+                {editorTab === "profile" ? (
+                  <div className="p-4">
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-slate-100">
+                      {form.thumbnail_url ? (
+                        <Image src={form.thumbnail_url} alt={form.name || "작가 미리보기"} fill className="object-cover" sizes="328px" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm text-slate-400">대표 이미지 없음</div>
+                      )}
+                    </div>
+                    <h3 className="mt-4 text-lg font-bold text-ink">{form.name || "작가명"}</h3>
+                    <p className="mt-1 text-sm text-slate-500">@{form.instagram_handle || "instagram"}</p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {form.hashtags.slice(0, 4).map((tag) => (
+                        <span key={tag} className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{tag}</span>
+                      ))}
+                    </div>
+                    <p className="mt-4 text-sm leading-6 text-slate-600">{form.bio || "공개용 소개가 여기에 표시됩니다."}</p>
+                  </div>
+                ) : primaryPreviewUrl ? (
+                  <div className="p-4">
+                    <InstagramEmbed url={primaryPreviewUrl} compact className="max-h-[420px] min-h-[260px] rounded-md border border-slate-200 bg-white" />
+                  </div>
+                ) : (
+                  <div className="flex min-h-[300px] items-center justify-center px-6 text-center text-sm leading-6 text-slate-400">
+                    갤러리 게시물 링크 1번을 입력하면 여기에 표시됩니다.
+                  </div>
+                )}
+              </div>
+            </aside>
+          ) : null}
+
+          {editorTab === "internal" ? (
+            <ArtistInternalManager artistId={initialArtist?.id} />
+          ) : null}
         </div>
       </div>
     </div>
