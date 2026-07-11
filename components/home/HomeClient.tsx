@@ -252,7 +252,7 @@ function RightAdSidebar() {
 
 function SectionBannerAd() {
   return (
-    <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
+    <section className="mx-auto mb-12 max-w-[1440px] px-5 md:px-8">
       <GoogleAd
         slot={ADSENSE_SLOTS.sectionBanner}
         label="섹션 사이 배너 광고"
@@ -264,15 +264,17 @@ function SectionBannerAd() {
 
 function ArtistSkeletonCard() {
   return (
-    <div className="overflow-hidden rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white">
-      <div className="aspect-[4/3] animate-pulse bg-[#f2f0ec]" />
-      <div className="space-y-2.5 p-3.5">
-        <div className="h-4 w-24 animate-pulse rounded-full bg-[#f2f0ec]" />
-        <div className="flex gap-1.5">
+    <div className="flex h-full flex-col overflow-hidden rounded-[16px] border border-[rgba(0,0,0,0.08)] bg-white">
+      <div className="aspect-square animate-pulse bg-[#f2f0ec]" />
+      <div className="flex flex-1 flex-col p-3.5 sm:p-4">
+        <div className="h-[42px]">
+          <div className="h-4 w-24 animate-pulse rounded-full bg-[#f2f0ec]" />
+        </div>
+        <div className="mt-2 flex h-[48px] gap-1.5">
           <div className="h-5 w-14 animate-pulse rounded-full bg-[#f2f0ec]" />
           <div className="h-5 w-14 animate-pulse rounded-full bg-[#f2f0ec]" />
         </div>
-        <div className="flex gap-3">
+        <div className="mt-auto flex min-h-9 gap-3 border-t border-black/[0.06] pt-3">
           <div className="h-3.5 w-14 animate-pulse rounded-full bg-[#f2f0ec]" />
           <div className="h-3.5 w-12 animate-pulse rounded-full bg-[#f2f0ec]" />
         </div>
@@ -293,7 +295,7 @@ function HorizontalArtistCard({
   return (
     <button type="button" onClick={onClick} className="trending-card text-left">
       {artist.thumbnail_url ? (
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
           <Image
             src={artist.thumbnail_url}
             alt={artist.name}
@@ -310,7 +312,7 @@ function HorizontalArtistCard({
           />
         </div>
       ) : (
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
           <Image
             src={ARTIST_SQUARE_PLACEHOLDER}
             alt={artist.name}
@@ -351,7 +353,7 @@ function NewArtistGridCard({
         {index + 1}
       </span>
       {artist.thumbnail_url ? (
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
           <Image
             src={artist.thumbnail_url}
             alt={artist.name}
@@ -368,7 +370,7 @@ function NewArtistGridCard({
           />
         </div>
       ) : (
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#f2f0ec]">
+        <div className="relative aspect-square overflow-hidden bg-[#f2f0ec]">
           <Image
             src={ARTIST_SQUARE_PLACEHOLDER}
             alt={artist.name}
@@ -556,7 +558,7 @@ function NewArtistsSection({
   }
 
   return (
-    <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
+    <section className="mx-auto mb-12 max-w-[1440px] px-5 md:px-8">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
           ✨ 새로운 인투니들!
@@ -566,7 +568,7 @@ function NewArtistsSection({
           {artists.map((artist, index) => (
             <div
               key={artist.id}
-              className="min-w-0"
+              className="h-full min-w-0"
             >
               <ArtistCard
                 artist={artist}
@@ -1020,7 +1022,7 @@ export default function HomeClient({
         </div>
       </nav>
 
-      <main className="mx-auto w-full max-w-[1520px] xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
+      <main className="mx-auto w-full max-w-[1872px] xl:grid xl:grid-cols-[160px_minmax(0,1440px)_160px] xl:justify-center xl:gap-8 xl:px-6">
         <aside className="hidden xl:block">
           <AdSidebarPlaceholder />
         </aside>
@@ -1166,7 +1168,7 @@ export default function HomeClient({
             </div>
           </section>
 
-          <section className="px-5 pb-9">
+          <section className="mx-auto max-w-[1440px] px-5 pb-9 md:px-8">
             <FilterBar
               genreItems={genreItems}
               activeGenres={activeGenres}
@@ -1195,7 +1197,7 @@ export default function HomeClient({
             />
           </section>
 
-          <div className="mx-auto mb-8 max-w-[1200px] px-5 md:px-8">
+          <div className="mx-auto mb-8 max-w-[1440px] px-5 md:px-8">
             <a
               href="https://forms.gle/1urGhUvYyJfGjY2H7"
               target="_blank"
@@ -1217,7 +1219,7 @@ export default function HomeClient({
           </div>
 
           {!isSearching && featuredMagazines.length > 0 ? (
-            <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
+            <section className="mx-auto mb-12 max-w-[1440px] px-5 md:px-8">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
                   이달의 매거진
@@ -1260,7 +1262,7 @@ export default function HomeClient({
           ) : null}
 
           {!isSearching && featuredHotArtists.length > 0 ? (
-            <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
+            <section className="mx-auto mb-12 max-w-[1440px] px-5 md:px-8">
               <div className="mb-5 flex items-center justify-between">
                 <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
                   🔥 요즘 뜨는 작가들
@@ -1312,7 +1314,7 @@ export default function HomeClient({
 
           {!isSearching && featuredNewArtists.length > 0 ? <SectionBannerAd /> : null}
 
-          <section ref={searchResultsRef} className="mx-auto max-w-[1200px] px-5 pb-20 md:px-8">
+          <section ref={searchResultsRef} className="mx-auto max-w-[1440px] px-5 pb-20 md:px-8">
             <div className="mb-5 flex items-baseline justify-between">
               <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
                 {gridTitle}
@@ -1323,7 +1325,7 @@ export default function HomeClient({
             </div>
 
             {showLoadingState ? (
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
                 {Array.from({ length: 8 }).map((_, index) => (
                   <ArtistSkeletonCard key={index} />
                 ))}
@@ -1379,7 +1381,7 @@ export default function HomeClient({
                 ) : null}
 
                 {regularVisibleArtists.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
                     {regularVisibleArtists.map((artist, index) => (
                       <ArtistCard
                         key={artist.id}
@@ -1401,7 +1403,7 @@ export default function HomeClient({
                         {embeddedVisibleArtists.length}명
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5 lg:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
                       {embeddedVisibleArtists.map((artist, index) => (
                         <ArtistCard
                           key={artist.id}
