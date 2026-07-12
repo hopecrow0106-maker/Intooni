@@ -218,9 +218,8 @@ function pickHeroDecorations(artists: Artist[]): HeroDecoration[] {
   }));
 }
 
-function pickRandomArtistByGenre(artists: Artist[], genre: string) {
-  const candidates = artists.filter((artist) => genre === "전체" || artist.genre === genre);
-  return candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : null;
+function pickRandomArtist(artists: Artist[]) {
+  return artists.length > 0 ? artists[Math.floor(Math.random() * artists.length)] : null;
 }
 
 function AdSidebarPlaceholder() {
@@ -616,10 +615,12 @@ export default function HomeClient({
   const [activeFollowerRanges, setActiveFollowerRanges] = useState<FollowerRangeKey[]>([]);
   const [showFollowerFilters, setShowFollowerFilters] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
-  const [randomGenre, setRandomGenre] = useState("전체");
   const [randomPickedArtist, setRandomPickedArtist] = useState<Artist | null>(null);
+  const [rouletteArtists, setRouletteArtists] = useState<Array<Artist | null>>([null, null, null]);
   const [showRandomModal, setShowRandomModal] = useState(false);
   const [randomRolling, setRandomRolling] = useState(false);
+  const [rouletteSettledColumns, setRouletteSettledColumns] = useState(0);
+  const [showRouletteBurst, setShowRouletteBurst] = useState(false);
   const [randomRollingName, setRandomRollingName] = useState("");
   const [showInquiryModal, setShowInquiryModal] = useState(false);
   const [typedInquiryText, setTypedInquiryText] = useState("");
@@ -654,32 +655,63 @@ export default function HomeClient({
     setSelectedArtist(artist);
   };
 
-  const startRandomPick = () => {
-    const candidates = allArtists.filter((artist) => randomGenre === "전체" || artist.genre === randomGenre);
-    const rollingPool = allArtists.length > 0 ? allArtists : candidates;
+  const openRandomRoulette = () => {
+    setShowRandomModal(true);
+    setRandomPickedArtist(null);
+    setRandomRollingName("");
+    setRouletteArtists([null, null, null]);
+    setRouletteSettledColumns(0);
+    setShowRouletteBurst(false);
+  };
 
-    if (candidates.length === 0 || randomRolling) {
+  const startRandomPick = () => {
+    if (allArtists.length === 0 || randomRolling) {
       return;
     }
 
     setRandomPickedArtist(null);
     setRandomRolling(true);
+    setRouletteSettledColumns(0);
+    setShowRouletteBurst(false);
 
+    const delays = [70, 70, 75, 80, 90, 100, 115, 130, 150, 170, 195, 220, 250, 285];
     let ticks = 0;
-    const shuffled = shuffleItems(rollingPool);
-    const timer = window.setInterval(() => {
+    const shuffled = shuffleItems(allArtists);
+    const rollNext = () => {
       const current = shuffled[ticks % shuffled.length];
+      const currentReelArtists = [
+        shuffled[ticks % shuffled.length],
+        shuffled[(ticks + 4) % shuffled.length],
+        shuffled[(ticks + 8) % shuffled.length]
+      ];
       setRandomRollingName(current.name);
-      ticks += 1;
-
-      if (ticks >= 18) {
-        window.clearInterval(timer);
-        const picked = pickRandomArtistByGenre(allArtists, randomGenre);
+      setRouletteArtists(currentReelArtists);
+      if (ticks === delays.length) {
+        const picked = pickRandomArtist(allArtists);
         setRandomPickedArtist(picked);
         setRandomRollingName(picked?.name ?? "");
-        setRandomRolling(false);
+        setRouletteArtists([picked, currentReelArtists[1], currentReelArtists[2]]);
+        setRouletteSettledColumns(1);
+        window.setTimeout(() => {
+          setRouletteArtists([picked, picked, currentReelArtists[2]]);
+          setRouletteSettledColumns(2);
+        }, 260);
+        window.setTimeout(() => {
+          setRouletteArtists([picked, picked, picked]);
+          setRouletteSettledColumns(3);
+          setRandomRolling(false);
+          setShowRouletteBurst(true);
+          window.setTimeout(() => setShowRouletteBurst(false), 1100);
+        }, 560);
+        return;
       }
-    }, 72);
+
+      const delay = delays[ticks];
+      ticks += 1;
+      window.setTimeout(rollNext, delay);
+    };
+
+    rollNext();
   };
 
   useEffect(() => {
@@ -808,8 +840,6 @@ export default function HomeClient({
   }, [artistCount, categories, genreCounts]);
 
   const featuredMagazines = useMemo(() => magazines.slice(0, 4), [magazines]);
-  const randomGenreItems = useMemo(() => ["전체", ...categories.map((category) => category.name)], [categories]);
-
   const searchExamples = useMemo(() => {
     const tags = allArtists.flatMap((artist) => [...artist.hashtags, ...artist.search_tags]);
     return [...new Set(tags.map((tag) => tag.replace(/^#/, "").trim()).filter(Boolean))];
@@ -963,11 +993,7 @@ export default function HomeClient({
         <div className="hidden shrink-0 items-center gap-2 sm:flex">
           <button
             type="button"
-            onClick={() => {
-              setShowRandomModal(true);
-              setRandomPickedArtist(null);
-              setRandomRollingName("");
-            }}
+            onClick={openRandomRoulette}
             aria-label="랜덤 인투니 찾기"
             className="rounded-full bg-[#55bfe8] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(74,171,211,0.28)] transition hover:-translate-y-0.5 hover:bg-[#38addd]"
           >
@@ -975,11 +1001,7 @@ export default function HomeClient({
           </button>
           <button
             type="button"
-            onClick={() => {
-              setShowRandomModal(true);
-              setRandomPickedArtist(null);
-              setRandomRollingName("");
-            }}
+            onClick={openRandomRoulette}
             className="relative hidden rounded-full border border-[#55bfe8] bg-white px-3 py-2 text-xs font-bold text-[#24728d] shadow-[0_10px_26px_rgba(74,171,211,0.18)] transition hover:-translate-y-0.5 hover:border-[#38addd] hover:text-[#1c6078] lg:inline-flex"
           >
             <span className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-b border-l border-[#55bfe8] bg-white" />
@@ -1009,11 +1031,7 @@ export default function HomeClient({
           </Link>
           <button
             type="button"
-            onClick={() => {
-              setShowRandomModal(true);
-              setRandomPickedArtist(null);
-              setRandomRollingName("");
-            }}
+            onClick={openRandomRoulette}
             className="flex items-center justify-center rounded-[16px] bg-[#55bfe8] px-3 py-3 text-center text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(74,171,211,0.24)]"
           >
             랜덤 인투니 찾기!
@@ -1494,7 +1512,7 @@ export default function HomeClient({
 
       {showRandomModal ? (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(10,20,28,0.42)] px-5"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(22,16,36,0.58)] px-4 py-5 backdrop-blur-[3px]"
           onClick={() => {
             if (!randomRolling) {
               setShowRandomModal(false);
@@ -1502,141 +1520,107 @@ export default function HomeClient({
           }}
         >
           <div
-            className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[32px] border border-[#c9efff] bg-white shadow-[0_28px_90px_rgba(36,114,141,0.22)] md:max-w-3xl"
+            className="relative w-full max-w-[740px] overflow-hidden rounded-[44px] border border-white/80 bg-[radial-gradient(circle_at_50%_0%,#ffffff_0%,#fff7fb_48%,#f7f1ff_100%)] px-5 py-7 shadow-[0_30px_100px_rgba(23,10,42,0.42)] sm:px-9 sm:py-9"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="relative overflow-hidden bg-gradient-to-br from-[#e5f8ff] via-white to-[#fff7f8] px-6 py-7">
-              <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#c9efff]/70" />
-              <div className="pointer-events-none absolute -bottom-14 -left-10 h-32 w-32 rounded-full bg-[#fff0f3]" />
+            <style jsx global>{`
+              @keyframes roulette-shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-3px) rotate(-0.4deg); }
+                75% { transform: translateX(3px) rotate(0.4deg); }
+              }
+              @keyframes slot-spin {
+                0% { transform: translateY(-18px) scale(0.92); opacity: 0.45; filter: blur(3px); }
+                50% { transform: translateY(18px) scale(1.08); opacity: 0.9; filter: blur(1px); }
+                100% { transform: translateY(-18px) scale(0.92); opacity: 0.45; filter: blur(3px); }
+              }
+              @keyframes slot-stop {
+                0% { transform: translateY(-16px) scale(1.08); }
+                58% { transform: translateY(5px) scale(0.97); }
+                78% { transform: translateY(-2px) scale(1.01); }
+                100% { transform: translateY(0) scale(1); }
+              }
+              @keyframes slot-lights {
+                0%, 100% { opacity: 0.3; transform: scale(0.75); }
+                50% { opacity: 1; transform: scale(1.1); }
+              }
+              @keyframes result-burst {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2) rotate(0deg); }
+                14% { opacity: 1; }
+                100% { opacity: 0; transform: translate(calc(-50% + var(--burst-x)), calc(-50% + var(--burst-y))) scale(1.1) rotate(240deg); }
+              }
+              @keyframes result-flash {
+                0% { opacity: 0; transform: scale(0.7); }
+                22% { opacity: 0.8; transform: scale(1.05); }
+                100% { opacity: 0; transform: scale(1.65); }
+              }
+              @keyframes result-ring {
+                0% { opacity: 0.95; transform: translate(-50%, -50%) scale(0.15); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(2.4); }
+              }
+            `}</style>
+            <div className="pointer-events-none absolute left-9 top-28 text-3xl text-[#ffcc51]">✦</div>
+            <div className="pointer-events-none absolute right-10 top-20 text-2xl text-[#ffa4cf]">✦</div>
+            <div className="pointer-events-none absolute bottom-32 left-8 text-xl text-[#b99bff]">✦</div>
+            <button type="button" onClick={() => setShowRandomModal(false)} disabled={randomRolling} className="absolute right-5 top-5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-xl text-[#8c7b8d] shadow-sm transition hover:bg-white disabled:opacity-40" aria-label="닫기">×</button>
 
-              <div className="relative flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-bold text-[#24728d]">Random Intooni</p>
-                  <h3 className="mt-1 text-3xl font-extrabold tracking-[-0.04em] text-[#1a1a1a]">
-                    랜덤 인투니 찾기
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#6b6b6b]">
-                    카테고리를 고르면 차르르륵 돌려서 오늘 볼 작가를 뽑아드려요.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowRandomModal(false)}
-                  disabled={randomRolling}
-                  className="rounded-full bg-white px-3 py-2 text-sm font-semibold text-[#6b6b6b] shadow-sm disabled:opacity-50"
-                >
-                  닫기
-                </button>
-              </div>
+            <div className="relative text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-white text-4xl shadow-[0_12px_28px_rgba(157,80,161,0.16)]">🎲</div>
+              <h3 className="mt-4 text-3xl font-black tracking-[-0.06em] text-[#342f39] sm:text-4xl">랜덤 <span className="text-[#f34e87]">인투니</span> 찾기</h3>
+              <p className="mt-3 text-sm font-medium text-[#8b7e8b] sm:text-base">오늘의 당신을 설레게 할 인투니를 찾아드려요! ✨</p>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 md:grid md:grid-cols-[1fr_280px] md:gap-6 md:space-y-0 md:px-6 md:py-6">
-              <div>
-                <p className="mb-3 text-sm font-bold text-[#1a1a1a]">어떤 카테고리에서 찾을까요?</p>
-                <div className="flex flex-wrap gap-2">
-                  {randomGenreItems.map((genre) => (
-                    <button
-                      key={genre}
-                      type="button"
-                      onClick={() => {
-                        setRandomGenre(genre);
-                        setRandomPickedArtist(null);
-                        setRandomRollingName("");
-                      }}
-                      disabled={randomRolling}
-                      className={`rounded-full border px-4 py-2 text-sm font-bold transition ${
-                        randomGenre === genre
-                          ? "border-[#8edcff] bg-[#dff5ff] text-[#24728d] shadow-[0_10px_22px_rgba(74,171,211,0.16)]"
-                          : "border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] text-[#6b6b6b] hover:border-[#8edcff] hover:text-[#24728d]"
-                      }`}
-                    >
-                      {genre}
-                    </button>
+            <div className="relative mt-7 rounded-[34px] bg-[linear-gradient(135deg,#ffc6df,#ffd7eb_50%,#f4b8db)] p-3 shadow-[inset_0_2px_8px_rgba(255,255,255,0.75),0_18px_35px_rgba(225,90,155,0.24)] sm:p-5">
+              {showRouletteBurst ? (
+                <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden rounded-[34px]" aria-hidden="true">
+                  <div className="absolute left-1/2 top-1/2 h-44 w-44 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,1)_0%,rgba(255,244,178,0.9)_26%,rgba(255,161,211,0.48)_50%,transparent_72%)] blur-sm animate-[result-flash_0.8s_ease-out_forwards]" />
+                  <div className="absolute left-1/2 top-1/2 h-24 w-24 rounded-full border-4 border-white/90 shadow-[0_0_24px_rgba(255,255,255,0.95)] animate-[result-ring_0.8s_ease-out_forwards]" />
+                  <div className="absolute left-1/2 top-1/2 h-24 w-24 rounded-full border-2 border-[#ffe576] shadow-[0_0_24px_rgba(255,220,107,0.95)] animate-[result-ring_0.8s_ease-out_0.13s_forwards]" />
+                  {[
+                    ["✦", "-155px", "-105px", "#ffcc51"], ["●", "-105px", "-145px", "#72d7ff"], ["✦", "15px", "-165px", "#c6a0ff"], ["◆", "125px", "-120px", "#ff7fac"],
+                    ["●", "165px", "-20px", "#ffd05b"], ["✦", "125px", "105px", "#8ee6c6"], ["◆", "25px", "150px", "#ff9fca"], ["●", "-95px", "135px", "#95b9ff"],
+                    ["✦", "-165px", "30px", "#ffcc51"], ["●", "-35px", "-125px", "#f58ed0"]
+                  ].map(([shape, x, y, color], index) => (
+                    <span key={index} className="absolute left-1/2 top-1/2 text-2xl font-black animate-[result-burst_0.9s_cubic-bezier(0.15,0.8,0.25,1)_forwards]" style={{ "--burst-x": x, "--burst-y": y, color, animationDelay: `${index * 18}ms` } as CSSProperties}>{shape}</span>
                   ))}
                 </div>
+              ) : null}
+              <span className="absolute left-0 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white bg-[#f75c9a] px-1 py-2 text-lg text-white shadow-lg">◀</span>
+              <span className="absolute right-0 top-1/2 z-10 translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white bg-[#f75c9a] px-1 py-2 text-lg text-white shadow-lg">▶</span>
+              <div className="pointer-events-none absolute inset-y-5 left-2 flex flex-col justify-around sm:left-3">
+                {[0, 1, 2, 3, 4, 5].map((light) => <i key={light} className={`h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_7px_white] ${randomRolling ? "animate-[slot-lights_0.38s_ease-in-out_infinite]" : "opacity-70"}`} style={{ animationDelay: `${light * 55}ms` }} />)}
               </div>
-
-              <div className="overflow-hidden rounded-[28px] border border-[#dff5ff] bg-[#f7fcff] px-4 py-4 text-center md:row-span-2 md:px-5 md:py-5">
-                {randomPickedArtist && !randomRolling ? (
-                  <div className="mx-auto mb-3 w-full max-w-[150px] overflow-hidden rounded-[20px] border border-[#dff5ff] bg-white shadow-[0_16px_32px_rgba(36,114,141,0.12)] sm:max-w-[190px] md:mb-4 md:max-w-[240px] md:rounded-[24px]">
-                    {randomPickedArtist.thumbnail_url ? (
-                      <div className="relative aspect-square bg-[#f2f0ec]">
-                        <Image
-                          src={randomPickedArtist.thumbnail_url}
-                          alt={randomPickedArtist.name}
-                          fill
-                          className="object-cover"
-                          sizes="220px"
-                        />
-                      </div>
-                    ) : getFallbackInstagramUrl(randomPickedArtist) ? (
-                      <div className="p-2">
-                        <InstagramEmbed
-                          url={getFallbackInstagramUrl(randomPickedArtist)}
-                          compact
-                          className="max-h-[170px] min-h-[120px] rounded-[16px] border border-[rgba(0,0,0,0.08)] md:max-h-none md:min-h-[220px] md:rounded-[18px]"
-                        />
-                      </div>
-                    ) : (
-                      <div className="relative aspect-square bg-[#f2f0ec]">
-                        <Image
-                          src={ARTIST_SQUARE_PLACEHOLDER}
-                          alt={randomPickedArtist.name}
-                          fill
-                          className="object-cover"
-                          sizes="220px"
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white text-3xl shadow-[0_16px_32px_rgba(36,114,141,0.12)]">
-                    🎲
-                  </div>
-                )}
-                <div className="relative mx-auto flex h-16 max-w-sm items-center justify-center overflow-hidden rounded-2xl bg-white px-4 shadow-inner">
-                  <p
-                    className={`text-2xl font-extrabold tracking-[-0.04em] text-[#24728d] ${
-                      randomRolling ? "animate-pulse" : ""
-                    }`}
-                  >
-                    {randomRollingName || randomPickedArtist?.name || "누가 나올까요?"}
-                  </p>
-                </div>
-                <p className="mt-2 text-xs font-semibold text-[#8a8a8a] md:mt-3">
-                  {randomRolling
-                    ? "차르르르륵... 고르는 중"
-                    : randomPickedArtist
-                      ? `${randomGenre}에서 발견한 오늘의 인투니`
-                      : "버튼을 누르면 랜덤 추천이 시작돼요"}
-                </p>
+              <div className="pointer-events-none absolute inset-y-5 right-2 flex flex-col justify-around sm:right-3">
+                {[0, 1, 2, 3, 4, 5].map((light) => <i key={light} className={`h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_7px_white] ${randomRolling ? "animate-[slot-lights_0.38s_ease-in-out_infinite]" : "opacity-70"}`} style={{ animationDelay: `${light * 55 + 110}ms` }} />)}
               </div>
-
-              <div className="sticky bottom-0 z-10 -mx-5 flex flex-col gap-2 self-end border-t border-[#dff5ff] bg-white/95 px-5 py-3 backdrop-blur sm:flex-row md:static md:col-start-1 md:mx-0 md:border-t-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-0">
-                <button
-                  type="button"
-                  onClick={startRandomPick}
-                  disabled={randomRolling || allArtists.length === 0}
-                  className="flex-1 rounded-full bg-[#74ccef] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(74,171,211,0.24)] transition hover:bg-[#51bce5] disabled:cursor-not-allowed disabled:bg-[#d8d6d2]"
-                >
-                  {randomRolling ? "돌리는 중..." : "차르르륵 돌리기"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!randomPickedArtist) {
-                      return;
-                    }
-                    setShowRandomModal(false);
-                    openArtistModal(randomPickedArtist);
-                  }}
-                  disabled={!randomPickedArtist || randomRolling}
-                  className="flex-1 rounded-full border border-[#c9efff] bg-white px-5 py-3 text-sm font-extrabold text-[#24728d] transition hover:border-[#74ccef] disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  추천 작가 보기
-                </button>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                {[0, 1, 2].map((column) => {
+                  const artist = rouletteArtists[column];
+                  const isSettled = rouletteSettledColumns > column;
+                  return (
+                    <div key={column} className={`relative flex h-[210px] flex-col items-center justify-center overflow-hidden rounded-[18px] border border-white/80 bg-white shadow-[inset_0_0_18px_rgba(115,50,92,0.15)] transition-transform duration-200 sm:h-[260px] sm:rounded-[22px] ${randomRolling && !isSettled ? "animate-[roulette-shake_0.16s_ease-in-out_infinite]" : ""}`}>
+                      {artist ? (
+                        <div className={`flex flex-col items-center ${randomRolling && !isSettled ? "animate-[slot-spin_0.18s_linear_infinite]" : randomRolling && isSettled ? "animate-[slot-stop_0.42s_cubic-bezier(0.2,0.8,0.2,1)_both]" : ""}`}>
+                          <div className="relative h-16 w-16 overflow-hidden rounded-full border-2 border-white bg-[#f6edf3] shadow-md sm:h-20 sm:w-20">
+                            <Image src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER} alt="" fill className="object-cover" sizes="80px" />
+                          </div>
+                          <span className="mt-2 max-w-[110px] truncate text-xs font-black text-[#504551] sm:text-sm">{artist.name}</span>
+                        </div>
+                      ) : (
+                        <div className="text-2xl font-black tracking-[0.2em] text-[#c6b5c1] sm:text-3xl">???</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
+
+            <p className="mt-5 text-center text-sm font-bold text-[#8b7e8b]">{randomRolling ? "룰렛이 돌아가고 있어요..." : randomPickedArtist ? `${randomPickedArtist.name}님이 선택되었어요!` : "버튼을 눌러 오늘의 인투니를 만나보세요"}</p>
+            <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <button type="button" onClick={startRandomPick} disabled={randomRolling || allArtists.length === 0} className="w-full rounded-full bg-[linear-gradient(110deg,#a94fff,#ef5ba6)] px-9 py-4 text-lg font-black text-white shadow-[0_14px_26px_rgba(196,68,203,0.35)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{randomRolling ? "룰렛 돌리는 중..." : "✦ 랜덤 추천 시작 ✦"}</button>
+              {randomPickedArtist ? <button type="button" onClick={() => { setShowRandomModal(false); openArtistModal(randomPickedArtist); }} className="w-full rounded-full border border-[#edb7d1] bg-white/80 px-7 py-4 text-sm font-extrabold text-[#d64d8c] transition hover:bg-white sm:w-auto">추천 작가 보기</button> : null}
+            </div>
+            <button type="button" onClick={() => setShowRandomModal(false)} disabled={randomRolling} className="mx-auto mt-4 block text-sm font-semibold text-[#b3a8b1] underline underline-offset-4 disabled:opacity-40">나중에</button>
           </div>
         </div>
       ) : null}
