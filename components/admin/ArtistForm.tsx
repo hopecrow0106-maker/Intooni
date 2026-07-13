@@ -861,7 +861,7 @@ export function ArtistForm({
           </label>
 
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-600">공개용 한 줄 소개</span>
+            <span className="text-sm font-medium text-slate-600">공개용 소개 (줄바꿈 유지)</span>
             <textarea
               value={form.bio}
               onChange={(event) => setForm((current) => ({ ...current, bio: event.target.value }))}
@@ -1117,7 +1117,18 @@ export function ArtistForm({
                         <span key={tag} className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">{tag}</span>
                       ))}
                     </div>
-                    <p className="mt-4 text-sm leading-6 text-slate-600">{form.bio || "공개용 소개가 여기에 표시됩니다."}</p>
+                    <p className="mt-4 whitespace-pre-wrap break-keep text-sm leading-6 text-slate-600">{form.bio || "공개용 소개가 여기에 표시됩니다."}</p>
+                    {form.instagram_handle.trim() ? (
+                      <a
+                        href={`https://www.instagram.com/${encodeURIComponent(form.instagram_handle.replace(/^@/, "").trim())}/`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-pink-400 hover:text-pink-600"
+                      >
+                        Instagram 바로가기
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    ) : null}
                   </div>
                 ) : primaryPreviewUrl ? (
                   <div className="p-4">
