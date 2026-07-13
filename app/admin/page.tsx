@@ -80,6 +80,7 @@ type ArtistEventMetricKey = Exclude<keyof ArtistChartItem, "id" | "name" | "tota
 
 const ADMIN_ARTISTS_PER_PAGE = 20;
 const ARTIST_STATS_STALE_DAYS = 14;
+const REQUIRED_GALLERY_POST_COUNT = 4;
 const GENERAL_SHEET_TARGETS: Array<{ value: GeneralAdminSheetImportTarget; label: string }> = [
   { value: "artists", label: "작가 기본정보 (artists)" },
   { value: "categories", label: "작가 카테고리 (categories)" },
@@ -667,11 +668,156 @@ const SHEET_SUMMARY_LABELS: Record<string, string> = {
   history_dates: "수집 날짜",
   artist_contacts: "작가 연락처",
   artist_collaborations: "협업 이력",
-  artist_b2b_profiles: "B2B 프로필"
+  artist_b2b_profiles: "B2B 프로필",
+  totalRows: "전체 행",
+  validRows: "검증 통과",
+  errorRows: "입력 오류",
+  conflictRows: "확인 필요",
+  createRows: "신규 생성",
+  updateRows: "수정 예정",
+  noChangeRows: "변경 없음",
+  upsertRows: "저장 예정"
 };
 
 function formatSheetSummaryLabel(key: string) {
   return SHEET_SUMMARY_LABELS[key] ?? key;
+}
+
+const SHEET_PREVIEW_STATUS: Record<
+  SheetPreviewDisplayRow["status"],
+  { label: string; description: string; className: string }
+> = {
+  CREATE: {
+    label: "신규 생성",
+    description: "시트 내용을 새 데이터로 등록합니다.",
+    className: "border-blue-200 bg-blue-50 text-blue-700"
+  },
+  UPDATE: {
+    label: "수정 예정",
+    description: "표시된 항목을 시트 값으로 변경합니다.",
+    className: "border-amber-200 bg-amber-50 text-amber-800"
+  },
+  NO_CHANGE: {
+    label: "변경 없음",
+    description: "운영 DB와 시트의 값이 같습니다.",
+    className: "border-slate-200 bg-slate-50 text-slate-600"
+  },
+  CONFLICT: {
+    label: "확인 필요",
+    description: "시트를 내보낸 뒤 운영 DB가 변경되어 자동 반영을 막았습니다.",
+    className: "border-orange-200 bg-orange-50 text-orange-800"
+  },
+  ERROR: {
+    label: "입력 오류",
+    description: "필수값이나 입력 형식을 확인해야 합니다.",
+    className: "border-red-200 bg-red-50 text-red-700"
+  }
+};
+
+const SHEET_FIELD_LABELS: Record<string, string> = {
+  name: "작가명",
+  instagram_handle: "인스타그램 아이디",
+  main_category_id: "대표 카테고리",
+  main_category_name: "대표 카테고리명",
+  bio: "공개용 한 줄 소개",
+  hashtags: "공개 해시태그",
+  search_tags: "검색 태그",
+  mood_tags: "분위기 태그",
+  style_tags: "그림체 태그",
+  topic_tags: "주제 태그",
+  thumbnail_url: "프로필 이미지",
+  character_url: "캐릭터 이미지",
+  gallery_post_urls: "대표 게시물",
+  show_on_site: "사이트 공개",
+  show_growth_on_site: "성장 통계 공개",
+  is_trending: "요즘 뜨는 작가",
+  hide_from_new: "새로운 인투니 노출",
+  status: "관리 상태",
+  sort_order: "정렬 순서",
+  internal_memo: "내부 메모",
+  brand_name: "브랜드명",
+  post_url: "게시물 링크",
+  content_summary: "협업 내용",
+  email: "이메일",
+  dm_available: "DM 가능 여부"
+};
+
+const SHEET_PREVIEW_META_FIELDS = new Set([
+  "id",
+  "artist_id",
+  "category_id",
+  "collaboration_id",
+  "created_at",
+  "updated_at",
+  "source_updated_at"
+]);
+
+function formatSheetPreviewError(error: string) {
+  const messages: Record<string, string> = {
+    "artist changed in DB after the sheet export":
+      "시트를 내보낸 뒤 관리자 화면이나 다른 프로그램에서 이 작가 정보가 변경되었습니다.",
+    "valid source_updated_at is required for existing artists":
+      "기준 시간이 없거나 잘못되었습니다. 운영 DB를 시트로 다시 내보내 주세요.",
+    "instagram_handle already exists; use its artist_id":
+      "같은 인스타그램 아이디의 작가가 이미 있습니다. 기존 작가 ID를 사용해 주세요.",
+    "artist_id does not exist": "운영 DB에서 해당 작가 ID를 찾을 수 없습니다.",
+    "instagram_handle belongs to another artist":
+      "입력한 인스타그램 아이디가 다른 작가에게 이미 연결되어 있습니다.",
+    "main_category_id and main_category_name do not match":
+      "대표 카테고리 ID와 카테고리명이 서로 일치하지 않습니다."
+  };
+
+  return messages[error] ?? error;
+}
+
+function formatSheetPreviewValue(field: string, value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "비어 있음";
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.join(", ") : "비어 있음";
+  }
+
+  if (typeof value === "boolean") {
+    if (field === "show_on_site") return value ? "공개" : "비공개";
+    if (field === "show_growth_on_site") return value ? "공개" : "비공개";
+    if (field === "hide_from_new") return value ? "숨김" : "노출";
+    return value ? "사용" : "사용 안 함";
+  }
+
+  if (field === "status") {
+    return ({ active: "활성", hidden: "내부 전용", archived: "보관" } as Record<string, string>)[String(value)] ?? String(value);
+  }
+
+  return String(value);
+}
+
+function normalizeSheetPreviewComparable(value: unknown): unknown {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) return value.map((item) => normalizeSheetPreviewComparable(item));
+  if (typeof value === "string") return value.normalize("NFC").trim();
+  return value;
+}
+
+function getSheetPreviewChanges(row: SheetPreviewDisplayRow) {
+  const before = row.before ?? {};
+  const after = row.after ?? row.record ?? {};
+  const fields = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
+
+  return fields
+    .filter((field) => !SHEET_PREVIEW_META_FIELDS.has(field))
+    .filter(
+      (field) =>
+        JSON.stringify(normalizeSheetPreviewComparable(before[field])) !==
+        JSON.stringify(normalizeSheetPreviewComparable(after[field]))
+    )
+    .map((field) => ({
+      field,
+      label: SHEET_FIELD_LABELS[field] ?? field,
+      before: formatSheetPreviewValue(field, before[field]),
+      after: formatSheetPreviewValue(field, after[field])
+    }));
 }
 
 function AdminSheetsPanel({
@@ -687,8 +833,15 @@ function AdminSheetsPanel({
 }) {
   const isBusy = busyOperation !== null;
   const [selectedTarget, setSelectedTarget] = useState<GeneralAdminSheetImportTarget>("artists");
+  const [previewFilter, setPreviewFilter] = useState<"ALL" | SheetPreviewDisplayRow["status"]>("ALL");
   const selectedTargetLabel =
     GENERAL_SHEET_TARGETS.find((target) => target.value === selectedTarget)?.label ?? selectedTarget;
+  const previewCounts = previewRows.reduce(
+    (counts, row) => ({ ...counts, [row.status]: counts[row.status] + 1 }),
+    { CREATE: 0, UPDATE: 0, NO_CHANGE: 0, CONFLICT: 0, ERROR: 0 }
+  );
+  const visiblePreviewRows =
+    previewFilter === "ALL" ? previewRows : previewRows.filter((row) => row.status === previewFilter);
 
   return (
     <section className="mt-4 space-y-4">
@@ -706,7 +859,7 @@ function AdminSheetsPanel({
           {[
             ["1", "시트로 내보내기", "현재 Supabase 데이터를 Google Sheets에 복사합니다."],
             ["2", "변경 미리보기", "시트 행을 검사하고 생성·수정·충돌 여부를 보여줍니다."],
-            ["3", "검증 후 반영", "오류가 없는 행만 확인을 거쳐 Supabase에 적용합니다."]
+            ["3", "검증 후 반영", "확인 필요나 입력 오류가 없을 때 운영 DB에 적용합니다."]
           ].map(([step, title, body]) => (
             <li key={step} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">{step}</span>
@@ -792,7 +945,9 @@ function AdminSheetsPanel({
       {status ? (
         <div
           className={`mt-3 rounded-lg border px-4 py-3 text-sm ${
-            status.tone === "success"
+            status.tone === "success" && Number(status.summary?.conflictRows ?? 0) > 0
+              ? "border-orange-200 bg-orange-50 text-orange-900"
+              : status.tone === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-800"
               : status.message.includes("GOOGLE_SHEETS_ENABLED")
                 ? "border-amber-200 bg-amber-50 text-amber-800"
@@ -817,40 +972,118 @@ function AdminSheetsPanel({
       ) : null}
 
       {previewRows.length > 0 ? (
-        <div className="mt-4 max-h-[420px] overflow-auto border-t border-slate-200 pt-3">
-          <table className="w-full min-w-[860px] border-collapse text-left text-xs">
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-bold text-ink">미리보기 결과</h4>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                수정 예정 {previewCounts.UPDATE + previewCounts.CREATE}건 · 변경 없음 {previewCounts.NO_CHANGE}건 · 확인 필요 {previewCounts.CONFLICT}건 · 입력 오류 {previewCounts.ERROR}건
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              결과 필터
+              <select
+                value={previewFilter}
+                onChange={(event) => setPreviewFilter(event.target.value as typeof previewFilter)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-slate-500"
+              >
+                <option value="ALL">전체 {previewRows.length}건</option>
+                <option value="UPDATE">수정 예정 {previewCounts.UPDATE}건</option>
+                <option value="CREATE">신규 생성 {previewCounts.CREATE}건</option>
+                <option value="CONFLICT">확인 필요 {previewCounts.CONFLICT}건</option>
+                <option value="ERROR">입력 오류 {previewCounts.ERROR}건</option>
+                <option value="NO_CHANGE">변경 없음 {previewCounts.NO_CHANGE}건</option>
+              </select>
+            </label>
+          </div>
+
+          {previewCounts.CONFLICT > 0 ? (
+            <div className="mb-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-xs leading-5 text-orange-900">
+              <p className="font-bold">확인 필요는 데이터 손상을 막기 위한 보호 상태입니다.</p>
+              <p className="mt-1">
+                아래에서 운영 DB 현재값과 시트 변경값을 비교하세요. 운영 DB 값을 유지하려면 필요한 시트 수정 내용을 따로 보관한 뒤 최신 DB를 다시 내보내고, 필요한 값만 다시 입력해 주세요.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="max-h-[560px] overflow-auto rounded-lg border border-slate-200">
+          <table className="w-full min-w-[980px] border-collapse text-left text-xs">
             <thead className="sticky top-0 bg-slate-100 text-slate-600">
               <tr>
-                <th className="px-3 py-2 font-semibold">Row</th>
-                <th className="px-3 py-2 font-semibold">Status</th>
-                <th className="px-3 py-2 font-semibold">Identifier</th>
-                <th className="px-3 py-2 font-semibold">Errors</th>
-                <th className="px-3 py-2 font-semibold">Before / after</th>
+                <th className="px-3 py-2 font-semibold">시트 행</th>
+                <th className="px-3 py-2 font-semibold">처리 결과</th>
+                <th className="px-3 py-2 font-semibold">대상</th>
+                <th className="px-3 py-2 font-semibold">확인 내용</th>
+                <th className="px-3 py-2 font-semibold">운영 DB 현재값 → 시트 변경값</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {previewRows.map((row) => {
+              {visiblePreviewRows.map((row) => {
                 const record = row.record ?? {};
+                const displayRecord = row.after ?? row.before ?? record;
                 const identifier =
                   record.artist_id ??
                   record.category_id ??
                   record.collaboration_id ??
                   record.name ??
                   "new row";
+                const name = displayRecord.name ?? displayRecord.brand_name ?? displayRecord.title;
+                const handle = displayRecord.instagram_handle;
+                const changes = getSheetPreviewChanges(row);
+                const statusMeta = SHEET_PREVIEW_STATUS[row.status];
                 return (
                   <tr key={`${row.rowNumber}-${row.status}`} className="align-top">
-                    <td className="px-3 py-2 font-mono text-slate-500">{row.rowNumber}</td>
-                    <td className="px-3 py-2 font-semibold text-ink">{row.status}</td>
-                    <td className="max-w-[220px] break-all px-3 py-2 text-slate-700">
-                      {String(identifier)}
+                    <td className="px-3 py-3 font-mono text-slate-500">{row.rowNumber}</td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex rounded-md border px-2 py-1 font-bold ${statusMeta.className}`}>
+                        {statusMeta.label}
+                      </span>
+                      <p className="mt-1 max-w-[180px] leading-5 text-slate-500">{statusMeta.description}</p>
                     </td>
-                    <td className="max-w-[260px] px-3 py-2 text-red-700">
-                      {(row.errors ?? []).join("; ") || "-"}
+                    <td className="max-w-[220px] px-3 py-3 text-slate-700">
+                      {name ? <p className="font-bold text-ink">{String(name)}</p> : null}
+                      {handle ? <p className="mt-0.5 text-slate-500">@{String(handle).replace(/^@/, "")}</p> : null}
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-[11px] text-slate-400">기술 ID 보기</summary>
+                        <p className="mt-1 break-all font-mono text-[10px] text-slate-400">{String(identifier)}</p>
+                      </details>
                     </td>
-                    <td className="max-w-[440px] px-3 py-2">
-                      <details>
-                        <summary className="cursor-pointer font-semibold text-slate-600">View</summary>
-                        <pre className="mt-2 whitespace-pre-wrap break-all rounded bg-slate-50 p-2 text-[11px] leading-5 text-slate-600">
+                    <td className="max-w-[280px] px-3 py-3">
+                      {(row.errors ?? []).length > 0 ? (
+                        <ul className="space-y-1 text-orange-800">
+                          {(row.errors ?? []).map((error) => (
+                            <li key={error}>{formatSheetPreviewError(error)}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="text-slate-400">별도 확인 사항 없음</span>
+                      )}
+                    </td>
+                    <td className="max-w-[500px] px-3 py-3">
+                      {changes.length > 0 ? (
+                        <details open={changes.length <= 3}>
+                          <summary className="cursor-pointer font-semibold text-slate-700">
+                            {changes.length}개 항목 {row.status === "CREATE" ? "입력" : "변경"}
+                          </summary>
+                          <dl className="mt-2 space-y-2">
+                            {changes.map((change) => (
+                              <div key={change.field} className="rounded-md bg-slate-50 p-2">
+                                <dt className="font-bold text-slate-700">{change.label}</dt>
+                                <dd className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 text-[11px] leading-5">
+                                  <span className="break-all text-slate-500">{change.before}</span>
+                                  <span className="font-bold text-slate-400" aria-hidden="true">→</span>
+                                  <span className="break-all font-semibold text-blue-700">{change.after}</span>
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </details>
+                      ) : (
+                        <span className="text-slate-400">변경된 값 없음</span>
+                      )}
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-[11px] text-slate-400">원본 데이터 보기</summary>
+                        <pre className="mt-2 whitespace-pre-wrap break-all rounded bg-slate-50 p-2 text-[10px] leading-5 text-slate-500">
                           {JSON.stringify({ before: row.before ?? null, after: row.after ?? row.record ?? null }, null, 2)}
                         </pre>
                       </details>
@@ -860,6 +1093,7 @@ function AdminSheetsPanel({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       ) : null}
     </section>
@@ -892,6 +1126,7 @@ export default function AdminPage() {
   const [artistPage, setArtistPage] = useState(1);
   const [showHiddenTagMissingOnly, setShowHiddenTagMissingOnly] = useState(false);
   const [showCharacterMissingOnly, setShowCharacterMissingOnly] = useState(false);
+  const [showGalleryMissingOnly, setShowGalleryMissingOnly] = useState(false);
   const [showDataEnrichmentPanel, setShowDataEnrichmentPanel] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState<"all" | "public" | "private">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden" | "archived">("all");
@@ -910,6 +1145,7 @@ export default function AdminPage() {
     setArtistSearch("");
     setShowHiddenTagMissingOnly(false);
     setShowCharacterMissingOnly(false);
+    setShowGalleryMissingOnly(false);
     setVisibilityFilter("all");
     setStatusFilter("all");
     setGrowthFilter("all");
@@ -922,6 +1158,7 @@ export default function AdminPage() {
     !artistSearch.trim() &&
     !showHiddenTagMissingOnly &&
     !showCharacterMissingOnly &&
+    !showGalleryMissingOnly &&
     visibilityFilter === "all" &&
     statusFilter === "archived" &&
     growthFilter === "all" &&
@@ -1279,6 +1516,8 @@ export default function AdminPage() {
     operation: SheetOperation,
     target: GeneralAdminSheetImportTarget = "artists"
   ) => {
+    const targetLabel =
+      GENERAL_SHEET_TARGETS.find((item) => item.value === target)?.label ?? target;
     const configs: Record<
       SheetOperation,
       {
@@ -1290,39 +1529,48 @@ export default function AdminPage() {
     > = {
       export: {
         endpoint: "/api/admin/sheets/export",
-        title: "Sheets export complete",
-        successMessage: "Supabase admin data was written to the configured Google Sheet."
+        title: "시트 내보내기 완료",
+        successMessage: "운영 DB의 최신 데이터를 Google Sheets에 복사했습니다."
       },
       previewGeneral: {
         endpoint: "/api/admin/sheets/import/preview",
         body: { sheet: target },
-        title: `${target} preview complete`,
-        successMessage: `${target} rows were validated without changing Supabase source data.`
+        title: `${targetLabel} 검사 완료`,
+        successMessage: "시트 내용을 검사했습니다. 아직 운영 DB에는 반영하지 않았습니다."
       },
       applyGeneral: {
         endpoint: "/api/admin/sheets/import/apply",
         body: { sheet: target },
-        title: `${target} import applied`,
-        successMessage: `Validated ${target} rows were applied to Supabase.`
+        title: `${targetLabel} 반영 완료`,
+        successMessage: "검증된 변경사항을 운영 DB에 반영했습니다."
       },
       previewArtistStats: {
         endpoint: "/api/admin/sheets/import/preview",
         body: { sheet: "artist_stats" },
-        title: "artist_stats preview complete",
-        successMessage: "Stat rows were validated without changing Supabase."
+        title: "통계 이력 검사 완료",
+        successMessage: "통계 이력을 검사했습니다. 아직 운영 DB에는 반영하지 않았습니다."
       },
       applyArtistStats: {
         endpoint: "/api/admin/sheets/import/apply",
         body: { sheet: "artist_stats" },
-        title: "artist_stats import applied",
-        successMessage: "Validated stat rows were upserted to official artist_stats."
+        title: "통계 이력 반영 완료",
+        successMessage: "검증된 통계 이력을 운영 DB에 저장했습니다."
       }
     };
 
     if (
+      operation === "export" &&
+      !window.confirm(
+        "현재 Google Sheets 내용을 운영 DB의 최신값으로 덮어씁니다. 시트에서 아직 반영하지 않은 수정사항은 사라질 수 있습니다. 계속할까요?"
+      )
+    ) {
+      return;
+    }
+
+    if (
       operation === "applyArtistStats" &&
       !window.confirm(
-        "Apply artist_stats rows to official Supabase stats? This upserts by artist_id + recorded_date."
+        "시트의 통계 이력을 운영 DB에 반영할까요? 같은 작가와 같은 기록일의 통계가 있으면 해당 값을 갱신합니다."
       )
     ) {
       return;
@@ -1330,7 +1578,7 @@ export default function AdminPage() {
 
     if (
       operation === "applyGeneral" &&
-      !window.confirm(`Apply validated ${target} rows from Google Sheets to Supabase?`)
+      !window.confirm(`검증된 ${targetLabel} 변경사항을 운영 DB에 반영할까요?`)
     ) {
       return;
     }
@@ -1418,6 +1666,14 @@ export default function AdminPage() {
       baseArtists = baseArtists.filter((artist) => artist.character_url.trim().length === 0);
     }
 
+    if (showGalleryMissingOnly) {
+      baseArtists = baseArtists.filter(
+        (artist) =>
+          artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length <
+          REQUIRED_GALLERY_POST_COUNT
+      );
+    }
+
     if (visibilityFilter !== "all") {
       baseArtists = baseArtists.filter((artist) =>
         visibilityFilter === "public"
@@ -1442,7 +1698,13 @@ export default function AdminPage() {
     if (internalDataFilter !== "all") {
       baseArtists = baseArtists.filter((artist) => {
         if (internalDataFilter === "missing") {
-          return !artist.last_stats_updated_at || !artist.search_tags.length || !artist.character_url.trim();
+          return (
+            !artist.last_stats_updated_at ||
+            !artist.search_tags.length ||
+            !artist.character_url.trim() ||
+            artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length <
+              REQUIRED_GALLERY_POST_COUNT
+          );
         }
         if (internalDataFilter === "has_contact") return artist.has_contact === true;
         if (internalDataFilter === "no_contact") return artist.has_contact !== true;
@@ -1478,6 +1740,7 @@ export default function AdminPage() {
     growthFilter,
     internalDataFilter,
     showCharacterMissingOnly,
+    showGalleryMissingOnly,
     showHiddenTagMissingOnly,
     statusFilter,
     trendingFilter,
@@ -1498,20 +1761,40 @@ export default function AdminPage() {
     [sortedArtists]
   );
 
+  const galleryMissingCount = useMemo(
+    () =>
+      sortedArtists.filter(
+        (artist) =>
+          artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length <
+          REQUIRED_GALLERY_POST_COUNT
+      ).length,
+    [sortedArtists]
+  );
+
   const dataEnrichmentNeededCount = useMemo(
     () =>
       new Set([
         ...sortedArtists
           .filter((artist) => artist.search_tags.map((tag) => tag.trim()).filter(Boolean).length === 0)
           .map((artist) => artist.id),
-        ...sortedArtists.filter((artist) => !artist.character_url.trim()).map((artist) => artist.id)
+        ...sortedArtists.filter((artist) => !artist.character_url.trim()).map((artist) => artist.id),
+        ...sortedArtists
+          .filter(
+            (artist) =>
+              artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length <
+              REQUIRED_GALLERY_POST_COUNT
+          )
+          .map((artist) => artist.id)
       ]).size,
     [sortedArtists]
   );
 
-  const selectDataEnrichmentCategory = (category: "search-tags" | "character-png") => {
+  const selectDataEnrichmentCategory = (
+    category: "search-tags" | "character-png" | "gallery-posts"
+  ) => {
     setShowHiddenTagMissingOnly(category === "search-tags");
     setShowCharacterMissingOnly(category === "character-png");
+    setShowGalleryMissingOnly(category === "gallery-posts");
   };
 
   useEffect(() => {
@@ -1523,6 +1806,7 @@ export default function AdminPage() {
     growthFilter,
     internalDataFilter,
     showCharacterMissingOnly,
+    showGalleryMissingOnly,
     showHiddenTagMissingOnly,
     statusFilter,
     trendingFilter,
@@ -1856,6 +2140,13 @@ export default function AdminPage() {
               >
                 누끼 PNG 누락만 {formatNumber(characterMissingCount)}
               </button>
+              <button
+                type="button"
+                onClick={() => setShowGalleryMissingOnly((current) => !current)}
+                className={getAdminControlClass(showGalleryMissingOnly)}
+              >
+                대표 게시물 누락만 {formatNumber(galleryMissingCount)}
+              </button>
             </div>
 
             <div className="flex max-w-2xl flex-col gap-2 sm:flex-row">
@@ -1935,7 +2226,7 @@ export default function AdminPage() {
             <StatsCard
               label="데이터 보강 필요"
               value={formatNumber(dataEnrichmentNeededCount)}
-              helper="검색 태그 또는 캐릭터 이미지 누락"
+              helper="검색 태그, 캐릭터 이미지 또는 대표 게시물 누락"
               onClick={() => setShowDataEnrichmentPanel((current) => !current)}
               active={showDataEnrichmentPanel}
             />
@@ -1953,19 +2244,24 @@ export default function AdminPage() {
                   onClick={() => {
                     setShowHiddenTagMissingOnly(false);
                     setShowCharacterMissingOnly(false);
+                    setShowGalleryMissingOnly(false);
                   }}
-                  className={getAdminControlClass(!showHiddenTagMissingOnly && !showCharacterMissingOnly)}
+                  className={getAdminControlClass(
+                    !showHiddenTagMissingOnly && !showCharacterMissingOnly && !showGalleryMissingOnly
+                  )}
                 >
                   전체 작가 보기
                 </button>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => selectDataEnrichmentCategory("search-tags")}
-                  aria-pressed={showHiddenTagMissingOnly && !showCharacterMissingOnly}
+                  aria-pressed={
+                    showHiddenTagMissingOnly && !showCharacterMissingOnly && !showGalleryMissingOnly
+                  }
                   className={`rounded-lg border px-4 py-3 text-left transition ${
-                    showHiddenTagMissingOnly && !showCharacterMissingOnly
+                    showHiddenTagMissingOnly && !showCharacterMissingOnly && !showGalleryMissingOnly
                       ? "border-orange-500 bg-orange-50"
                       : "border-orange-100 bg-orange-50/50 hover:border-orange-300"
                   }`}
@@ -1976,15 +2272,34 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => selectDataEnrichmentCategory("character-png")}
-                  aria-pressed={showCharacterMissingOnly && !showHiddenTagMissingOnly}
+                  aria-pressed={
+                    showCharacterMissingOnly && !showHiddenTagMissingOnly && !showGalleryMissingOnly
+                  }
                   className={`rounded-lg border px-4 py-3 text-left transition ${
-                    showCharacterMissingOnly && !showHiddenTagMissingOnly
+                    showCharacterMissingOnly && !showHiddenTagMissingOnly && !showGalleryMissingOnly
                       ? "border-sky-500 bg-sky-50"
                       : "border-sky-100 bg-sky-50/50 hover:border-sky-300"
                   }`}
                 >
                   <span className="block text-sm font-semibold text-sky-800">캐릭터 PNG 누락</span>
                   <span className="mt-1 block text-xs text-sky-700">{formatNumber(characterMissingCount)}명 · 투명 배경 캐릭터 이미지를 추가해 주세요</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectDataEnrichmentCategory("gallery-posts")}
+                  aria-pressed={
+                    showGalleryMissingOnly && !showHiddenTagMissingOnly && !showCharacterMissingOnly
+                  }
+                  className={`rounded-lg border px-4 py-3 text-left transition ${
+                    showGalleryMissingOnly && !showHiddenTagMissingOnly && !showCharacterMissingOnly
+                      ? "border-violet-500 bg-violet-50"
+                      : "border-violet-100 bg-violet-50/50 hover:border-violet-300"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-violet-800">대표 게시물 링크 누락</span>
+                  <span className="mt-1 block text-xs text-violet-700">
+                    {formatNumber(galleryMissingCount)}명 · 4개 슬롯을 모두 채워 주세요
+                  </span>
                 </button>
               </div>
             </section>
@@ -2083,8 +2398,8 @@ export default function AdminPage() {
             />
             <StatsCard
               label="데이터 보강 필요"
-              value={formatNumber(hiddenTagMissingCount + characterMissingCount)}
-              helper="검색 태그와 누끼 PNG 누락 합산"
+              value={formatNumber(dataEnrichmentNeededCount)}
+              helper="검색 태그, 누끼 PNG, 대표 게시물 누락 작가"
             />
           </section>
 

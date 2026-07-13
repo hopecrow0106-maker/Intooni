@@ -135,6 +135,10 @@ function splitPipe(value: string) {
   );
 }
 
+function splitHashtags(value: string) {
+  return splitPipe(value).map((tag) => `#${tag}`);
+}
+
 function parseBoolean(value: string, fallback: boolean, errors: string[], label: string) {
   const normalized = normalizeText(value).toLowerCase();
   if (!normalized) {
@@ -281,7 +285,7 @@ export function parseArtistSheetValues(values: string[][]): ArtistSheetPreviewRo
         main_category_id: normalizeText(valueAt(row, headerIndex, "main_category_id")),
         main_category_name: normalizeText(valueAt(row, headerIndex, "main_category_name")),
         bio: normalizeText(valueAt(row, headerIndex, "bio")),
-        hashtags: splitPipe(valueAt(row, headerIndex, "hashtags")),
+        hashtags: splitHashtags(valueAt(row, headerIndex, "hashtags")),
         search_tags: splitPipe(valueAt(row, headerIndex, "search_tags")),
         mood_tags: splitPipe(valueAt(row, headerIndex, "mood_tags")),
         style_tags: splitPipe(valueAt(row, headerIndex, "style_tags")),

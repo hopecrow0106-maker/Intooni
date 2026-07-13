@@ -91,7 +91,7 @@ describe("artist sheet parser", () => {
       name: "작가",
       instagram_handle: "some_handle",
       main_category_id: "category-1",
-      hashtags: ["일상", "썰툰"],
+      hashtags: ["#일상", "#썰툰"],
       search_tags: ["검색", "키워드"],
       show_on_site: true,
       show_growth_on_site: false,

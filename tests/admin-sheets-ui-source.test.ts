@@ -13,7 +13,7 @@ describe("admin Google Sheets UI wiring", () => {
 
   it("requires an explicit artist_stats target for manual stats imports", () => {
     expect(adminPageSource).toContain('body: { sheet: "artist_stats" }');
-    expect(adminPageSource).toContain("Apply artist_stats rows to official Supabase stats");
+    expect(adminPageSource).toContain("시트의 통계 이력을 운영 DB에 반영할까요?");
   });
 
   it("offers every general management tab through one preview/apply selector", () => {
@@ -29,7 +29,8 @@ describe("admin Google Sheets UI wiring", () => {
     }
     expect(adminPageSource).toContain('onRun("previewGeneral", selectedTarget)');
     expect(adminPageSource).toContain('onRun("applyGeneral", selectedTarget)');
-    expect(adminPageSource).toContain("Before / after");
+    expect(adminPageSource).toContain("운영 DB 현재값 → 시트 변경값");
+    expect(adminPageSource).toContain("확인 필요는 데이터 손상을 막기 위한 보호 상태입니다.");
     expect(adminPageSource).toContain("row.errors");
   });
 });

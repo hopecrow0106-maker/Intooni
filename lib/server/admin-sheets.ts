@@ -71,12 +71,20 @@ function toCellValue(value: unknown) {
   return value;
 }
 
-function comparableValue(value: unknown) {
+function comparableValue(value: unknown): unknown {
   if (value === null || value === undefined) {
     return "";
   }
 
-  return Array.isArray(value) ? value : value;
+  if (Array.isArray(value)) {
+    return value.map((item) => comparableValue(item));
+  }
+
+  if (typeof value === "string") {
+    return value.normalize("NFC").trim();
+  }
+
+  return value;
 }
 
 function artistComparableRecord(record: ArtistSheetRecord, mainCategoryId: string | null) {
@@ -610,6 +618,20 @@ export async function previewArtistSheetImport() {
       }
     }
 
+    const before = artistDatabaseComparable(existing);
+
+    // A timestamp-only change is not a conflict when the managed values are identical.
+    // This commonly happens after another admin workflow touches an artist record.
+    if (sameComparableRecord(before, after)) {
+      rows.push({
+        ...row,
+        status: "NO_CHANGE" as ArtistImportStatus,
+        before,
+        after
+      });
+      continue;
+    }
+
     const sourceUpdatedAt = Date.parse(record.source_updated_at);
     const databaseUpdatedAt = Date.parse(existing.updated_at ?? "");
     if (!Number.isFinite(sourceUpdatedAt) || !Number.isFinite(databaseUpdatedAt)) {
@@ -634,10 +656,9 @@ export async function previewArtistSheetImport() {
       continue;
     }
 
-    const before = artistDatabaseComparable(existing);
     rows.push({
       ...row,
-      status: sameComparableRecord(before, after) ? "NO_CHANGE" : "UPDATE",
+      status: "UPDATE",
       before,
       after
     });

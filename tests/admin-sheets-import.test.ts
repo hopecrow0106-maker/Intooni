@@ -56,7 +56,7 @@ function validArtistRow(overrides: Partial<Record<(typeof ARTISTS_SHEET_HEADERS)
   return ARTISTS_SHEET_HEADERS.map((header) => values[header] ?? "");
 }
 
-function setupSupabase() {
+function setupSupabase(existingArtistOverrides: Record<string, unknown> = {}) {
   const calls = {
     inserts: [] as Array<{ table: string; payload: unknown }>,
     upserts: [] as Array<{ table: string; payload: unknown; options: unknown }>,
@@ -99,7 +99,7 @@ function setupSupabase() {
                       instagram_handle: "sheet_handle",
                       main_category_id: "category-1",
                       bio: "Old bio",
-                      hashtags: ["daily", "toon"],
+                      hashtags: ["#daily", "#toon"],
                       search_tags: ["search"],
                       mood_tags: ["warm"],
                       style_tags: ["essay"],
@@ -114,7 +114,8 @@ function setupSupabase() {
                       status: "active",
                       sort_order: 3,
                       internal_memo: "Internal note",
-                      updated_at: "2026-07-11T00:00:00.000Z"
+                      updated_at: "2026-07-11T00:00:00.000Z",
+                      ...existingArtistOverrides
                     }
                   : null;
             return {
@@ -231,6 +232,39 @@ describe("admin sheets import workflow", () => {
     const result = await applyArtistSheetImport();
     expect(result.applied).toBe(true);
     expect(calls.updates.filter((call) => call.table === "artists")).toEqual([]);
+  });
+
+  it("does not report a stale timestamp as a conflict when managed values are unchanged", async () => {
+    setupSupabase();
+    vi.mocked(getSheetValues).mockResolvedValue([
+      [...ARTISTS_SHEET_HEADERS],
+      validArtistRow({
+        bio: "Old bio",
+        source_updated_at: "2026-07-10T00:00:00.000Z"
+      })
+    ]);
+
+    const preview = await previewArtistSheetImport();
+
+    expect(preview.rows[0].status).toBe("NO_CHANGE");
+    expect(preview.summary.conflictRows).toBe(0);
+    expect(preview.summary.noChangeRows).toBe(1);
+  });
+
+  it("ignores trailing whitespace differences in existing text fields", async () => {
+    setupSupabase({
+      bio: "Public bio\n",
+      updated_at: "2026-07-12T00:00:00.000Z"
+    });
+    vi.mocked(getSheetValues).mockResolvedValue([
+      [...ARTISTS_SHEET_HEADERS],
+      validArtistRow({ source_updated_at: "2026-07-10T00:00:00.000Z" })
+    ]);
+
+    const preview = await previewArtistSheetImport();
+
+    expect(preview.rows[0].status).toBe("NO_CHANGE");
+    expect(preview.summary.conflictRows).toBe(0);
   });
 
   it("rejects blank-id rows when the normalized handle already exists", async () => {

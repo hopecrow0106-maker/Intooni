@@ -62,8 +62,10 @@ function getStatusLabel(status: Artist["status"]) {
 function DataBadges({ artist }: { artist: Artist }) {
   const missingSearchTags = artist.search_tags.map((tag) => tag.trim()).filter(Boolean).length === 0;
   const missingCharacter = !artist.character_url.trim();
+  const galleryPostCount = artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length;
+  const missingGalleryPosts = galleryPostCount < 4;
 
-  if (!missingSearchTags && !missingCharacter) {
+  if (!missingSearchTags && !missingCharacter && !missingGalleryPosts) {
     return <span className="text-xs font-medium text-emerald-600">정상</span>;
   }
 
@@ -77,6 +79,11 @@ function DataBadges({ artist }: { artist: Artist }) {
       {missingCharacter ? (
         <span className="rounded bg-sky-50 px-1.5 py-1 text-[11px] font-semibold text-sky-700">
           캐릭터 PNG 누락
+        </span>
+      ) : null}
+      {missingGalleryPosts ? (
+        <span className="rounded bg-violet-50 px-1.5 py-1 text-[11px] font-semibold text-violet-700">
+          대표 게시물 {galleryPostCount}/4
         </span>
       ) : null}
     </div>
