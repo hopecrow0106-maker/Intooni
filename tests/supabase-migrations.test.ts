@@ -17,7 +17,8 @@ const migrationFiles = {
   collaborationContent: "202607110007_add_collaboration_content_summary.sql",
   legacyGrowthBaseline: "202607110008_backfill_legacy_growth_baseline.sql",
   schemaHousekeeping: "202607110009_schema_housekeeping.sql",
-  domainClassification: "202607110010_domain_classification.sql"
+  domainClassification: "202607110010_domain_classification.sql",
+  publicBioBackfill: "202607130011_backfill_public_bio_from_internal_memo.sql"
 } as const;
 
 function readMigration(fileName: string) {
@@ -43,7 +44,8 @@ describe("Supabase refactor migrations", () => {
       migrationFiles.collaborationContent,
       migrationFiles.legacyGrowthBaseline,
       migrationFiles.schemaHousekeeping,
-      migrationFiles.domainClassification
+      migrationFiles.domainClassification,
+      migrationFiles.publicBioBackfill
     ]);
   });
 
