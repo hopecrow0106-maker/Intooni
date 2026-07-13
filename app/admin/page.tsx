@@ -892,6 +892,7 @@ export default function AdminPage() {
   const [artistPage, setArtistPage] = useState(1);
   const [showHiddenTagMissingOnly, setShowHiddenTagMissingOnly] = useState(false);
   const [showCharacterMissingOnly, setShowCharacterMissingOnly] = useState(false);
+  const [showDataEnrichmentPanel, setShowDataEnrichmentPanel] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState<"all" | "public" | "private">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden" | "archived">("all");
   const [growthFilter, setGrowthFilter] = useState<"all" | "public" | "private">("all");
@@ -1497,6 +1498,22 @@ export default function AdminPage() {
     [sortedArtists]
   );
 
+  const dataEnrichmentNeededCount = useMemo(
+    () =>
+      new Set([
+        ...sortedArtists
+          .filter((artist) => artist.search_tags.map((tag) => tag.trim()).filter(Boolean).length === 0)
+          .map((artist) => artist.id),
+        ...sortedArtists.filter((artist) => !artist.character_url.trim()).map((artist) => artist.id)
+      ]).size,
+    [sortedArtists]
+  );
+
+  const selectDataEnrichmentCategory = (category: "search-tags" | "character-png") => {
+    setShowHiddenTagMissingOnly(category === "search-tags");
+    setShowCharacterMissingOnly(category === "character-png");
+  };
+
   useEffect(() => {
     setArtistPage(1);
   }, [
@@ -1917,13 +1934,61 @@ export default function AdminPage() {
             />
             <StatsCard
               label="데이터 보강 필요"
-              value={formatNumber(new Set([
-                ...sortedArtists.filter((artist) => artist.search_tags.length === 0).map((artist) => artist.id),
-                ...sortedArtists.filter((artist) => !artist.character_url.trim()).map((artist) => artist.id)
-              ]).size)}
+              value={formatNumber(dataEnrichmentNeededCount)}
               helper="검색 태그 또는 캐릭터 이미지 누락"
+              onClick={() => setShowDataEnrichmentPanel((current) => !current)}
+              active={showDataEnrichmentPanel}
             />
           </section>
+
+          {showDataEnrichmentPanel ? (
+            <section className="mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="데이터 보강 필요 항목">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-ink">데이터 보강 항목</p>
+                  <p className="mt-1 text-xs text-slate-500">항목을 누르면 해당 누락 작가만 목록에서 확인할 수 있습니다.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHiddenTagMissingOnly(false);
+                    setShowCharacterMissingOnly(false);
+                  }}
+                  className={getAdminControlClass(!showHiddenTagMissingOnly && !showCharacterMissingOnly)}
+                >
+                  전체 작가 보기
+                </button>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => selectDataEnrichmentCategory("search-tags")}
+                  aria-pressed={showHiddenTagMissingOnly && !showCharacterMissingOnly}
+                  className={`rounded-lg border px-4 py-3 text-left transition ${
+                    showHiddenTagMissingOnly && !showCharacterMissingOnly
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-orange-100 bg-orange-50/50 hover:border-orange-300"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-orange-800">검색 태그 누락</span>
+                  <span className="mt-1 block text-xs text-orange-700">{formatNumber(hiddenTagMissingCount)}명 · 검색용 숨김 태그를 추가해 주세요</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectDataEnrichmentCategory("character-png")}
+                  aria-pressed={showCharacterMissingOnly && !showHiddenTagMissingOnly}
+                  className={`rounded-lg border px-4 py-3 text-left transition ${
+                    showCharacterMissingOnly && !showHiddenTagMissingOnly
+                      ? "border-sky-500 bg-sky-50"
+                      : "border-sky-100 bg-sky-50/50 hover:border-sky-300"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-sky-800">캐릭터 PNG 누락</span>
+                  <span className="mt-1 block text-xs text-sky-700">{formatNumber(characterMissingCount)}명 · 투명 배경 캐릭터 이미지를 추가해 주세요</span>
+                </button>
+              </div>
+            </section>
+          ) : null}
 
         </>
       ) : activeTab === "magazines" ? (
