@@ -85,6 +85,12 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
                   </h2>
                 </div>
                 <p className="text-sm text-[#a0a0a0]">{artist.genre} 작가</p>
+                {artist.bio.trim() ? (
+                  <div className="rounded-[16px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-3">
+                    <p className="text-[11px] font-semibold text-[#8a8a8a]">작가 프로필</p>
+                    <p className="mt-1 break-keep text-sm leading-6 text-[#4b4b4b]">{artist.bio.trim()}</p>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-2 pt-1">
                   {artist.hashtags.map((tag) => (
                     <span
