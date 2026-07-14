@@ -1,10 +1,28 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
 import { listPublicMagazines } from "@/lib/server/public-magazines";
+import { CANONICAL_SITE_URL, SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const magazineUrl = `${CANONICAL_SITE_URL}/magazine`;
+
+export const metadata: Metadata = {
+  title: `인투니 매거진 | ${SITE_NAME}`,
+  description: "인스타툰 작가와 작품을 더 깊게 살펴보는 인투니 매거진입니다.",
+  alternates: {
+    canonical: magazineUrl
+  },
+  openGraph: {
+    type: "website",
+    url: magazineUrl,
+    title: `인투니 매거진 | ${SITE_NAME}`,
+    description: "인스타툰 작가와 작품을 더 깊게 살펴보는 인투니 매거진입니다."
+  }
+};
 
 export default async function MagazineListPage() {
   const items = await listPublicMagazines().catch(() => []);

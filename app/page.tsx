@@ -1,12 +1,23 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import HomeClient from "@/components/home/HomeClient";
 import { listPublicArtists } from "@/lib/server/public-artists";
 import { listPublicMagazines } from "@/lib/server/public-magazines";
+import { CANONICAL_SITE_URL } from "@/lib/site";
 import { getSupabasePublicServerClient } from "@/lib/supabase";
 import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: CANONICAL_SITE_URL
+  },
+  openGraph: {
+    url: CANONICAL_SITE_URL
+  }
+};
 
 async function getPublicCategories() {
   try {
@@ -48,9 +59,11 @@ export default async function HomePage() {
       <noscript>
         <nav aria-label="인투니 작가 링크">
           <ul>
-            {artists.slice(0, 100).map((artist) => (
+            {artists.map((artist) => (
               <li key={artist.id}>
-                <Link href={artistPath(artist.instagram_handle)}>{artist.name}</Link>
+                <Link href={artistPath(artist.instagram_handle)}>
+                  {artist.name} · {artist.category} · @{artist.instagram_handle.replace(/^@/, "")}
+                </Link>
               </li>
             ))}
           </ul>

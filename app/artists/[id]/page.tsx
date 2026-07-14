@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
@@ -15,6 +16,8 @@ type ArtistDetailPageProps = {
     id: string;
   };
 };
+
+export const revalidate = 3600;
 
 function formatCount(value: number) {
   if (value >= 1_000_000) {
@@ -57,11 +60,6 @@ function uniqueKeywords(values: string[]) {
   return Array.from(new Set(values.map(normalizeKeyword).filter(Boolean)));
 }
 
-function joinKoreanList(values: string[], fallback: string) {
-  const keywords = uniqueKeywords(values).slice(0, 6);
-  return keywords.length > 0 ? keywords.join(", ") : fallback;
-}
-
 function buildArtistSeoDescription(artist: {
   name: string;
   instagram_handle: string;
@@ -73,29 +71,50 @@ function buildArtistSeoDescription(artist: {
   style_tags: string[];
   topic_tags: string[];
 }) {
-  const handle = artist.instagram_handle.replace(/^@/, "").trim();
-  const visibleKeywords = uniqueKeywords([
+  const bioSummary = artist.bio.replace(/\s+/g, " ").trim();
+  const keywordDescription = buildArtistKeywordDescription(artist);
+
+  return bioSummary ? `${bioSummary} ${keywordDescription}` : keywordDescription;
+}
+
+function getKoreanTopicParticle(value: string) {
+  const lastHangul = Array.from(value.trim())
+    .reverse()
+    .find((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 0xac00 && code <= 0xd7a3;
+    });
+
+  if (!lastHangul) return "는";
+
+  return (lastHangul.charCodeAt(0) - 0xac00) % 28 === 0 ? "는" : "은";
+}
+
+function buildArtistKeywordDescription(artist: {
+  name: string;
+  category: string;
+  hashtags: string[];
+  search_tags: string[];
+  mood_tags: string[];
+  style_tags: string[];
+  topic_tags: string[];
+}) {
+  const keywords = uniqueKeywords([
+    ...artist.search_tags,
     ...artist.hashtags,
     ...artist.topic_tags,
     ...artist.style_tags,
     ...artist.mood_tags
-  ]);
-  const searchKeywords = joinKoreanList([...visibleKeywords, ...artist.search_tags], artist.category);
-  const styleKeywords = joinKoreanList([...artist.style_tags, ...artist.mood_tags], artist.category);
-  const topicKeywords = joinKoreanList([...artist.topic_tags, ...artist.hashtags], artist.category);
-  const bio = artist.bio.trim();
+  ]).slice(0, 6);
+  const keywordText = keywords.length > 0 ? keywords.join(", ") : artist.category;
 
-  if (bio) {
-    return `${artist.name}는 ${bio} 인스타툰 작가입니다. ${searchKeywords} 같은 키워드로 찾는 분들에게 추천되며, 인스타 아이디는 @${handle}입니다.`;
-  }
-
-  return `${artist.name}는 ${styleKeywords} 분위기와 ${topicKeywords} 주제를 다루는 ${artist.category} 인스타툰 작가입니다. 인스타 아이디는 @${handle}이며, 인투니에서 ${searchKeywords} 같은 해시태그와 키워드로 쉽게 찾을 수 있습니다.`;
+  return `${artist.name}${getKoreanTopicParticle(artist.name)} ${keywordText} 키워드로 찾을 수 있는 ${artist.category} 인스타툰 작가입니다.`;
 }
 
-async function getArtistBySlug(slug: string) {
+const getArtistBySlug = cache(async (slug: string) => {
   const normalizedSlug = normalizeArtistSlug(slug);
   return getPublicArtistByHandle(normalizedSlug);
-}
+});
 
 export async function generateMetadata({
   params
@@ -162,9 +181,36 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
   const galleryPostUrls = artist.gallery_post_urls.filter((url) => url.trim());
   const fallbackInstagramUrl = galleryPostUrls[0];
   const seoDescription = buildArtistSeoDescription(artist);
+  const keywordDescription = buildArtistKeywordDescription(artist);
+  const handle = artist.instagram_handle.replace(/^@/, "").trim();
+  const pageUrl = `${getSiteUrl()}/artists/${canonicalSlug}`;
+  const instagramProfileUrl = `https://www.instagram.com/${handle}/`;
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    url: pageUrl,
+    name: `${artist.name} | ${artist.category} 작가 | ${SITE_NAME}`,
+    description: seoDescription,
+    dateCreated: artist.created_at || undefined,
+    dateModified: artist.updated_at || artist.created_at || undefined,
+    about: {
+      "@type": "Person",
+      name: artist.name,
+      alternateName: `@${handle}`,
+      description: artist.bio || seoDescription,
+      image: artist.thumbnail_url || undefined,
+      sameAs: [instagramProfileUrl]
+    }
+  };
 
   return (
     <main className="mx-auto w-full max-w-[1520px] px-4 py-8 md:px-6 md:py-12 xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(structuredData).replace(/</g, "\\u003c")
+        }}
+      />
       <aside className="hidden xl:block">
         <AdSidebarPlaceholder />
       </aside>
@@ -253,7 +299,14 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
 
               <section className="rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white px-4 py-4">
                 <h2 className="text-sm font-bold text-[#1a1a1a]">작가 소개</h2>
-                <p className="mt-2 text-sm leading-7 text-[#4b4b4b]">{seoDescription}</p>
+                {artist.bio.trim() ? (
+                  <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[#4b4b4b]">
+                    {artist.bio}
+                  </p>
+                ) : null}
+                <p className={`${artist.bio.trim() ? "mt-4 border-t border-slate-100 pt-4" : "mt-2"} text-sm leading-7 text-[#6b6b6b]`}>
+                  {keywordDescription}
+                </p>
               </section>
             </div>
           </div>
