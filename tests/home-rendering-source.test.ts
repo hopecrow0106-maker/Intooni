@@ -24,11 +24,20 @@ describe("home SSR rendering contracts", () => {
     expect(instagramShowcaseSource).toContain("min-w-0 max-w-full overflow-hidden");
   });
 
-  it("keeps the first hero characters stable while initial data refreshes", () => {
-    expect(homeSource).not.toContain("pickHeroDecorations");
+  it("randomizes hero characters once per browser refresh", () => {
+    expect(homeSource).toContain("pickRandomHeroDecorations");
+    expect(homeSource).toContain("hasRandomizedHeroRef");
+    expect(homeSource).toContain("setHeroDecorations(randomizedDecorations)");
     expect(homeSource).toContain(
       "current.length > 0 ? current : pickInitialHeroDecorations(nextArtists)"
     );
+  });
+
+  it("reshuffles the Instagram artist showcase at the top of every hour", () => {
+    expect(homeSource).toContain("instagramArtistOrder");
+    expect(homeSource).toContain("scheduleNextHourlyShuffle");
+    expect(homeSource).toContain("nextHour.setMinutes(60, 0, 0)");
+    expect(homeSource).toContain("setInstagramArtistOrder(createRandomOrderMap(allArtists))");
   });
 
   it("renders a real artist detail link in every artist card", () => {

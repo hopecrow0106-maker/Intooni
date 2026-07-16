@@ -65,6 +65,11 @@ describe("Admin artist management surface", () => {
     expect(adminPage).toContain("toggleArchivedArtistFilter");
     expect(adminPage).toContain('setStatusFilter("archived")');
     expect(adminPage).toContain("보관 처리된 작가 · 클릭해서 보기");
+    expect(adminPage).toContain("toggleHiddenArtistFilter");
+    expect(adminPage).toContain('setStatusFilter("hidden")');
+    expect(adminPage).toContain("숨김 처리된 작가 · 클릭해서 보기");
+    expect(adminPage).toContain("rankedArtistChartItems");
+    expect(adminPage).toContain('.filter((item) => item.status === "active")');
     expect(adminPage).toContain("대표 게시물 링크 누락");
     expect(adminPage).toContain('selectDataEnrichmentCategory("gallery-posts")');
     expect(adminPage).toContain("필터 초기화");

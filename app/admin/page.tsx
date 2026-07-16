@@ -65,6 +65,7 @@ type SearchQuerySummary = {
 type ArtistChartItem = {
   id: string;
   name: string;
+  status: Artist["status"];
   total: number;
   artist_click: number;
   instagram_outbound: number;
@@ -76,7 +77,10 @@ type MagazineChartItem = {
   views: number;
 };
 
-type ArtistEventMetricKey = Exclude<keyof ArtistChartItem, "id" | "name" | "total">;
+type ArtistEventMetricKey = Exclude<
+  keyof ArtistChartItem,
+  "id" | "name" | "status" | "total"
+>;
 
 const ADMIN_ARTISTS_PER_PAGE = 20;
 const ARTIST_STATS_STALE_DAYS = 14;
@@ -1166,6 +1170,26 @@ export default function AdminPage() {
     categoryFilter === "all" &&
     internalDataFilter === "all";
 
+  const hiddenOnlyFilterActive =
+    !artistSearch.trim() &&
+    !showHiddenTagMissingOnly &&
+    !showCharacterMissingOnly &&
+    !showGalleryMissingOnly &&
+    visibilityFilter === "all" &&
+    statusFilter === "hidden" &&
+    growthFilter === "all" &&
+    trendingFilter === "all" &&
+    categoryFilter === "all" &&
+    internalDataFilter === "all";
+
+  const toggleHiddenArtistFilter = () => {
+    const shouldClear = hiddenOnlyFilterActive;
+    resetArtistFilters();
+    if (!shouldClear) {
+      setStatusFilter("hidden");
+    }
+  };
+
   const toggleArchivedArtistFilter = () => {
     const shouldClear = archivedOnlyFilterActive;
     resetArtistFilters();
@@ -1843,6 +1867,7 @@ export default function AdminPage() {
           return {
             id: artist.id,
             name: artist.name,
+            status: artist.status,
             total: 0,
             artist_click: 0,
             instagram_outbound: 0
@@ -1854,6 +1879,7 @@ export default function AdminPage() {
         return {
           id: artist.id,
           name: artist.name,
+          status: artist.status,
           total,
           artist_click: stats.artist_click,
           instagram_outbound: stats.instagram_outbound
@@ -1863,9 +1889,18 @@ export default function AdminPage() {
       .sort((a, b) => b.total - a.total);
   }, [artistStats, sortedArtists]);
 
+  const rankedArtistChartItems = useMemo(
+    () => allArtistChartItems.filter((item) => item.status === "active"),
+    [allArtistChartItems]
+  );
+
   const artistChartItems = useMemo(
-    () => allArtistChartItems.slice(0, showAllArtistStats ? allArtistChartItems.length : 5),
-    [allArtistChartItems, showAllArtistStats]
+    () =>
+      rankedArtistChartItems.slice(
+        0,
+        showAllArtistStats ? rankedArtistChartItems.length : 5
+      ),
+    [rankedArtistChartItems, showAllArtistStats]
   );
 
   const totalArtistInteractions = useMemo(
@@ -1912,7 +1947,7 @@ export default function AdminPage() {
     });
   }, [allArtistChartItems]);
 
-  const topArtistChartItem = allArtistChartItems[0] ?? null;
+  const topArtistChartItem = rankedArtistChartItems[0] ?? null;
 
   const totalSearchCount = useMemo(
     () => searchQueries.reduce((sum, item) => sum + item.count, 0),
@@ -2205,7 +2240,7 @@ export default function AdminPage() {
             </div>
           </section>
 
-          <section className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <section className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
             <StatsCard
               label="등록 작가"
               value={formatNumber(sortedArtists.length)}
@@ -2217,7 +2252,14 @@ export default function AdminPage() {
               helper="활성 상태이며 공개 설정된 작가"
             />
             <StatsCard
-              label="내부 전용"
+              label="숨김 작가"
+              value={formatNumber(sortedArtists.filter((artist) => artist.status === "hidden").length)}
+              helper="숨김 처리된 작가 · 클릭해서 보기"
+              onClick={toggleHiddenArtistFilter}
+              active={hiddenOnlyFilterActive}
+            />
+            <StatsCard
+              label="보관 처리"
               value={formatNumber(sortedArtists.filter((artist) => artist.status === "archived").length)}
               helper="보관 처리된 작가 · 클릭해서 보기"
               onClick={toggleArchivedArtistFilter}

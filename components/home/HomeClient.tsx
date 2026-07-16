@@ -208,6 +208,18 @@ function pickInitialHeroDecorations(artists: Artist[]): HeroDecoration[] {
     }));
 }
 
+function pickRandomHeroDecorations(artists: Artist[]): HeroDecoration[] {
+  return shuffleItems(artists.filter((artist) => artist.character_url.trim()))
+    .slice(0, 4)
+    .map((artist, index) => ({
+      artist,
+      duration: 7,
+      delay: HERO_DELAYS[index] ?? "0s",
+      driftX: index % 2 === 0 ? 12 : -12,
+      driftY: 12
+    }));
+}
+
 function pickRandomArtist(artists: Artist[]) {
   return artists.length > 0 ? artists[Math.floor(Math.random() * artists.length)] : null;
 }
@@ -541,6 +553,9 @@ export default function HomeClient({
   const [artistRandomOrder, setArtistRandomOrder] = useState<Record<string, number>>(() =>
     createInitialOrderMap(initialHomeArtists)
   );
+  const [instagramArtistOrder, setInstagramArtistOrder] = useState<Record<string, number>>(() =>
+    createInitialOrderMap(initialHomeArtists)
+  );
   const [artistCount, setArtistCount] = useState(initialHomeArtists.length);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [genreCounts, setGenreCounts] = useState<Record<string, number>>(() =>
@@ -574,6 +589,7 @@ export default function HomeClient({
   const [typedInquiryText, setTypedInquiryText] = useState("");
   const [growthMetric, setGrowthMetric] = useState<GrowthMetric>("followers");
   const [growthValueMode, setGrowthValueMode] = useState<GrowthValueMode>("count");
+  const hasRandomizedHeroRef = useRef(false);
   const lastLoggedSearchRef = useRef("");
   const searchResultsRef = useRef<HTMLElement | null>(null);
 
@@ -583,6 +599,38 @@ export default function HomeClient({
   useEffect(() => {
     setArtistRandomOrder(createRandomOrderMap(initialHomeArtists));
   }, [initialHomeArtists]);
+
+  useEffect(() => {
+    if (allArtists.length === 0) {
+      return;
+    }
+
+    let hourlyShuffleTimer: number | undefined;
+
+    const shuffleInstagramArtists = () => {
+      setInstagramArtistOrder(createRandomOrderMap(allArtists));
+    };
+
+    const scheduleNextHourlyShuffle = () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setMinutes(60, 0, 0);
+
+      hourlyShuffleTimer = window.setTimeout(() => {
+        shuffleInstagramArtists();
+        scheduleNextHourlyShuffle();
+      }, nextHour.getTime() - now.getTime());
+    };
+
+    shuffleInstagramArtists();
+    scheduleNextHourlyShuffle();
+
+    return () => {
+      if (hourlyShuffleTimer !== undefined) {
+        window.clearTimeout(hourlyShuffleTimer);
+      }
+    };
+  }, [allArtists]);
 
   const trackArtistEvent = (artistId: string) => {
     void fetch("/api/artist-events", {
@@ -658,6 +706,20 @@ export default function HomeClient({
 
     rollNext();
   };
+
+  useEffect(() => {
+    if (hasRandomizedHeroRef.current || allArtists.length === 0) {
+      return;
+    }
+
+    const randomizedDecorations = pickRandomHeroDecorations(allArtists);
+    if (randomizedDecorations.length === 0) {
+      return;
+    }
+
+    setHeroDecorations(randomizedDecorations);
+    hasRandomizedHeroRef.current = true;
+  }, [allArtists]);
 
   useEffect(() => {
     let mounted = true;
@@ -818,7 +880,13 @@ export default function HomeClient({
       ),
     [allArtists]
   );
-  const featuredInstagramArtists = allArtists;
+  const featuredInstagramArtists = useMemo(
+    () =>
+      [...allArtists].sort(
+        (a, b) => (instagramArtistOrder[a.id] ?? 0) - (instagramArtistOrder[b.id] ?? 0)
+      ),
+    [allArtists, instagramArtistOrder]
+  );
   const featuredWeeklyGrowthArtists = useMemo(() => {
     const sortedByGrowth = allArtists.filter((artist) => artist.is_weekly_comparable !== false).sort((a, b) => {
       const aGrowth = getWeeklyGrowthValue(a, growthMetric, growthValueMode);

@@ -2,6 +2,7 @@ export type GrowthAnalyticsArtist = {
   id: string;
   name: string;
   instagram_handle: string;
+  status?: "active" | "hidden" | "archived";
 };
 
 export type GrowthAnalyticsStat = {
@@ -137,6 +138,10 @@ export function buildAdminGrowthAnalytics(
   }
 
   const comparable = rankings.filter((item) => item.followers_delta !== null);
+  const rankingCandidates = comparable.filter((item) => {
+    const status = artistById.get(item.artist_id)?.status;
+    return status !== "hidden" && status !== "archived";
+  });
   const latestDate = dates.at(-1) ?? null;
   const latestDateCoverage = latestDate
     ? normalizedStats.filter((stat) => stat.recorded_date === latestDate).length
@@ -158,15 +163,15 @@ export function buildAdminGrowthAnalytics(
       latest_date_coverage: latestDateCoverage
     },
     timeline,
-    top_followers: [...comparable]
+    top_followers: [...rankingCandidates]
       .filter((item) => (item.followers_delta ?? 0) > 0)
       .sort((left, right) => (right.followers_delta ?? 0) - (left.followers_delta ?? 0))
       .slice(0, 12),
-    top_posts: [...comparable]
+    top_posts: [...rankingCandidates]
       .filter((item) => (item.posts_delta ?? 0) > 0)
       .sort((left, right) => (right.posts_delta ?? 0) - (left.posts_delta ?? 0))
       .slice(0, 12),
-    follower_declines: [...comparable]
+    follower_declines: [...rankingCandidates]
       .filter((item) => (item.followers_delta ?? 0) < 0)
       .sort((left, right) => (left.followers_delta ?? 0) - (right.followers_delta ?? 0))
       .slice(0, 12),

@@ -37,7 +37,10 @@ export async function GET() {
   try {
     const supabase = getSupabaseAdminClient() as any;
     const [artistsResult, stats] = await Promise.all([
-      supabase.from("artists").select("id, name, instagram_handle").order("name"),
+      supabase
+        .from("artists")
+        .select("id, name, instagram_handle, status")
+        .order("name"),
       readAllStats()
     ]);
     if (artistsResult.error) throw artistsResult.error;
