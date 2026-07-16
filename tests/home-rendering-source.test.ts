@@ -6,12 +6,23 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const homeSource = readFileSync(path.join(root, "components/home/HomeClient.tsx"), "utf8");
 const cardSource = readFileSync(path.join(root, "components/ArtistCard.tsx"), "utf8");
+const instagramShowcaseSource = readFileSync(
+  path.join(root, "components/InstagramArtistShowcase.tsx"),
+  "utf8"
+);
 
 describe("home SSR rendering contracts", () => {
   it("uses deterministic initial ordering before client-side randomization", () => {
     expect(homeSource).toContain("createInitialOrderMap(initialHomeArtists)");
     expect(homeSource).toContain("pickInitialHeroDecorations(initialHomeArtists)");
     expect(homeSource).not.toContain("return shuffleItems(uniqueTags)");
+  });
+
+  it("keeps the first hero characters stable while initial data refreshes", () => {
+    expect(homeSource).not.toContain("pickHeroDecorations");
+    expect(homeSource).toContain(
+      "current.length > 0 ? current : pickInitialHeroDecorations(nextArtists)"
+    );
   });
 
   it("renders a real artist detail link in every artist card", () => {
@@ -27,14 +38,37 @@ describe("home SSR rendering contracts", () => {
     expect(cardSource).toContain("usesUniformHeight");
     expect(cardSource).toContain("aspect-square");
     expect(cardSource).toContain('className="min-h-[220px] rounded-[16px]');
-    expect(homeSource).toContain("uniformHeight={false}");
     expect(homeSource).toContain('max-w-[1440px]');
+    expect(homeSource).toContain("<InstagramArtistFeatureCard");
   });
 
   it("keeps server-rendered artists when the client refresh is temporarily empty", () => {
     expect(homeSource).toContain(
       "const nextArtists = fetchedArtists.length > 0 ? fetchedArtists : initialHomeArtists"
     );
+  });
+
+  it("shows first Instagram posts with compact artist identity and count information", () => {
+    expect(homeSource).toContain("featuredInstagramArtists");
+    expect(homeSource).toContain("<InstagramArtistShowcase");
+    expect(instagramShowcaseSource).toContain("getFirstInstagramPost");
+    expect(instagramShowcaseSource).toContain("UsersRound");
+    expect(instagramShowcaseSource).toContain("Images");
+    expect(instagramShowcaseSource).toContain("artist.post_count");
+    expect(instagramShowcaseSource).toContain("게시물");
+    expect(instagramShowcaseSource).not.toContain("artist.bio");
+    expect(instagramShowcaseSource).not.toContain("weekly_follower_growth");
+    expect(instagramShowcaseSource).toContain("프로필 보기");
+    expect(instagramShowcaseSource).toContain("xl:grid-cols-4");
+    expect(instagramShowcaseSource).toContain('max-w-[1440px]');
+    expect(homeSource).toContain('max-w-[1600px]');
+    expect(homeSource).toContain("<InstagramArtistFeatureCard");
+    expect(homeSource).not.toContain("AdSidebarPlaceholder");
+    expect(homeSource).not.toContain("SectionBannerAd");
+    expect(instagramShowcaseSource).toContain("PAGE_SIZE = 30");
+    expect(instagramShowcaseSource).toContain("IntersectionObserver");
+    expect(instagramShowcaseSource).not.toContain("{pageIndex + 1}페이지");
+    expect(instagramShowcaseSource).toContain("다음 30명의 게시물을 불러오는 중");
   });
 
   it("labels count-based growth as increase count", () => {

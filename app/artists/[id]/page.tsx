@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
+import { ArtistBackButton } from "@/components/ArtistBackButton";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
 import type { PublicArtistDTO } from "@/lib/domain/public-artist";
@@ -52,63 +52,15 @@ function getArtistSlug(artist: Pick<PublicArtistDTO, "id" | "instagram_handle">)
   return encodeURIComponent(handle || artist.id);
 }
 
-function normalizeKeyword(value: string) {
-  return value.replace(/^#/, "").trim();
-}
-
-function uniqueKeywords(values: string[]) {
-  return Array.from(new Set(values.map(normalizeKeyword).filter(Boolean)));
-}
-
 function buildArtistSeoDescription(artist: {
   name: string;
   instagram_handle: string;
   category: string;
   bio: string;
-  hashtags: string[];
-  search_tags: string[];
-  mood_tags: string[];
-  style_tags: string[];
-  topic_tags: string[];
 }) {
   const bioSummary = artist.bio.replace(/\s+/g, " ").trim();
-  const keywordDescription = buildArtistKeywordDescription(artist);
 
-  return bioSummary ? `${bioSummary} ${keywordDescription}` : keywordDescription;
-}
-
-function getKoreanTopicParticle(value: string) {
-  const lastHangul = Array.from(value.trim())
-    .reverse()
-    .find((character) => {
-      const code = character.charCodeAt(0);
-      return code >= 0xac00 && code <= 0xd7a3;
-    });
-
-  if (!lastHangul) return "는";
-
-  return (lastHangul.charCodeAt(0) - 0xac00) % 28 === 0 ? "는" : "은";
-}
-
-function buildArtistKeywordDescription(artist: {
-  name: string;
-  category: string;
-  hashtags: string[];
-  search_tags: string[];
-  mood_tags: string[];
-  style_tags: string[];
-  topic_tags: string[];
-}) {
-  const keywords = uniqueKeywords([
-    ...artist.search_tags,
-    ...artist.hashtags,
-    ...artist.topic_tags,
-    ...artist.style_tags,
-    ...artist.mood_tags
-  ]).slice(0, 6);
-  const keywordText = keywords.length > 0 ? keywords.join(", ") : artist.category;
-
-  return `${artist.name}${getKoreanTopicParticle(artist.name)} ${keywordText} 키워드로 찾을 수 있는 ${artist.category} 인스타툰 작가입니다.`;
+  return bioSummary || `${artist.name} ${artist.category} 인스타툰 작가 프로필입니다.`;
 }
 
 const getArtistBySlug = cache(async (slug: string) => {
@@ -181,7 +133,6 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
   const galleryPostUrls = artist.gallery_post_urls.filter((url) => url.trim());
   const fallbackInstagramUrl = galleryPostUrls[0];
   const seoDescription = buildArtistSeoDescription(artist);
-  const keywordDescription = buildArtistKeywordDescription(artist);
   const handle = artist.instagram_handle.replace(/^@/, "").trim();
   const pageUrl = `${getSiteUrl()}/artists/${canonicalSlug}`;
   const instagramProfileUrl = `https://www.instagram.com/${handle}/`;
@@ -217,21 +168,8 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
 
       <div className="min-w-0">
         <article className="mx-auto max-w-5xl space-y-8">
-          <div className="flex items-center justify-between gap-4">
-            <Link
-              href="/"
-              className="inline-flex items-center rounded-full border border-[rgba(0,0,0,0.08)] bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900"
-            >
-              ← 홈으로
-            </Link>
-            <TrackedArtistActionLink
-              artistId={artist.id}
-              eventType="instagram_outbound"
-              href={`https://instagram.com/${artist.instagram_handle.replace(/^@/, "")}`}
-              className="inline-flex items-center rounded-full bg-[#ff4d6d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#e83a5a]"
-            >
-              인스타 바로가기
-            </TrackedArtistActionLink>
+          <div>
+            <ArtistBackButton />
           </div>
 
           <div className="grid gap-6 overflow-hidden rounded-[28px] border border-[rgba(0,0,0,0.08)] bg-white p-5 shadow-[0_16px_40px_rgba(0,0,0,0.06)] md:grid-cols-[340px_minmax(0,1fr)] md:p-8">
@@ -304,10 +242,16 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                     {artist.bio}
                   </p>
                 ) : null}
-                <p className={`${artist.bio.trim() ? "mt-4 border-t border-slate-100 pt-4" : "mt-2"} text-sm leading-7 text-[#6b6b6b]`}>
-                  {keywordDescription}
-                </p>
               </section>
+
+              <TrackedArtistActionLink
+                artistId={artist.id}
+                eventType="instagram_outbound"
+                href={instagramProfileUrl}
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#ff4d6d] px-5 text-sm font-semibold text-white transition hover:bg-[#e83a5a]"
+              >
+                인스타그램 바로가기
+              </TrackedArtistActionLink>
             </div>
           </div>
 

@@ -24,6 +24,7 @@ describe("public artist event wiring", () => {
 
   it("uses instagram_outbound for public Instagram profile and post actions", () => {
     expect(sources.modal.match(/eventType="instagram_outbound"/g)?.length).toBe(2);
+    expect(sources.modal).toContain("max-w-[440px]");
   });
 
   it("does not track Admin Instagram preview/profile actions", () => {

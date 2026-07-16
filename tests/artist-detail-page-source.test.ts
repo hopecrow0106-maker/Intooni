@@ -50,6 +50,18 @@ describe("artist detail page source", () => {
     expect(pageSource).not.toContain('eventType="embed_click"');
   });
 
+  it("uses browser history for the back action", () => {
+    const backButtonSource = readFileSync(
+      path.resolve(__dirname, "../components/ArtistBackButton.tsx"),
+      "utf8"
+    );
+
+    expect(pageSource).toContain("ArtistBackButton");
+    expect(pageSource).not.toContain("← 홈으로");
+    expect(backButtonSource).toContain("router.back()");
+    expect(backButtonSource).toContain("뒤로가기");
+  });
+
   it("serves cacheable, machine-readable artist profile pages", () => {
     expect(pageSource).toContain("export const revalidate = 3600");
     expect(pageSource).toContain("cache(async (slug: string)");
@@ -59,12 +71,13 @@ describe("artist detail page source", () => {
     expect(pageSource).toContain("sameAs: [instagramProfileUrl]");
   });
 
-  it("separates the original public bio from the generated keyword description", () => {
-    expect(pageSource).toContain("buildArtistKeywordDescription");
+  it("shows the original public bio without exposing hidden search keywords", () => {
     expect(pageSource).toContain("whitespace-pre-line");
     expect(pageSource).toContain("{artist.bio}");
-    expect(pageSource).toContain("{keywordDescription}");
-    expect(pageSource).toContain("키워드로 찾을 수 있는");
+    expect(pageSource).not.toContain("buildArtistKeywordDescription");
+    expect(pageSource).not.toContain("keywordDescription");
+    expect(pageSource).not.toContain("키워드로 찾을 수 있는");
+    expect(pageSource).not.toContain("search_tags");
     expect(pageSource).toContain('artist.bio.replace(/\\s+/g, " ").trim()');
   });
 });

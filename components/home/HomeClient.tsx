@@ -9,12 +9,14 @@ import {
   type FollowerRangeKey,
   type GenreFilterItem
 } from "@/components/FilterBar";
-import { GoogleAd } from "@/components/GoogleAd";
 import { ArtistCard } from "@/components/ArtistCard";
 import { ArtistModal } from "@/components/ArtistModal";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
+import {
+  InstagramArtistFeatureCard,
+  InstagramArtistShowcase
+} from "@/components/InstagramArtistShowcase";
 import { SearchBar } from "@/components/SearchBar";
-import { ADSENSE_SLOTS } from "@/lib/adsense";
 import type { PublicArtistDTO } from "@/lib/domain/public-artist";
 import type { PublicMagazineDTO } from "@/lib/domain/public-magazine";
 import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/placeholders";
@@ -206,56 +208,8 @@ function pickInitialHeroDecorations(artists: Artist[]): HeroDecoration[] {
     }));
 }
 
-function pickHeroDecorations(artists: Artist[]): HeroDecoration[] {
-  const selected = shuffleItems(artists.filter((artist) => artist.character_url.trim())).slice(0, 4);
-
-  return selected.map((artist, index) => ({
-    artist,
-    duration: 6 + Math.random() * 3,
-    delay: HERO_DELAYS[index] ?? "0s",
-    driftX: (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 12),
-    driftY: 8 + Math.random() * 10
-  }));
-}
-
 function pickRandomArtist(artists: Artist[]) {
   return artists.length > 0 ? artists[Math.floor(Math.random() * artists.length)] : null;
-}
-
-function AdSidebarPlaceholder() {
-  return (
-    <GoogleAd
-      slot={ADSENSE_SLOTS.leftSidebar}
-      label="데스크톱 왼쪽 광고"
-      className="sticky top-20 min-h-[600px] w-[160px]"
-      format="vertical"
-      fullWidthResponsive={false}
-    />
-  );
-}
-
-function RightAdSidebar() {
-  return (
-    <GoogleAd
-      slot={ADSENSE_SLOTS.rightSidebar}
-      label="데스크톱 오른쪽 광고"
-      className="sticky top-20 min-h-[600px] w-[160px]"
-      format="vertical"
-      fullWidthResponsive={false}
-    />
-  );
-}
-
-function SectionBannerAd() {
-  return (
-    <section className="mx-auto mb-12 max-w-[1200px] px-5 md:px-8">
-      <GoogleAd
-        slot={ADSENSE_SLOTS.sectionBanner}
-        label="섹션 사이 배너 광고"
-        className="min-h-[90px] w-full"
-      />
-    </section>
-  );
 }
 
 function ArtistSkeletonCard() {
@@ -560,20 +514,14 @@ function NewArtistsSection({
           ✨ 새로운 인투니들!
         </h2>
       </div>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {artists.map((artist, index) => (
-            <div
-              key={artist.id}
-              className="min-w-0"
-            >
-              <ArtistCard
-                artist={artist}
-                index={index}
-                onClick={() => onArtistClick(artist)}
-                uniformHeight={false}
-              />
-            </div>
-          ))}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {artists.map((artist) => (
+          <InstagramArtistFeatureCard
+            key={artist.id}
+            artist={artist}
+            onArtistClick={onArtistClick}
+          />
+        ))}
       </div>
     </section>
   );
@@ -626,8 +574,6 @@ export default function HomeClient({
   const [typedInquiryText, setTypedInquiryText] = useState("");
   const [growthMetric, setGrowthMetric] = useState<GrowthMetric>("followers");
   const [growthValueMode, setGrowthValueMode] = useState<GrowthValueMode>("count");
-  const hasMoreArtists = false;
-  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastLoggedSearchRef = useRef("");
   const searchResultsRef = useRef<HTMLElement | null>(null);
 
@@ -636,7 +582,6 @@ export default function HomeClient({
 
   useEffect(() => {
     setArtistRandomOrder(createRandomOrderMap(initialHomeArtists));
-    setHeroDecorations(pickHeroDecorations(initialHomeArtists));
   }, [initialHomeArtists]);
 
   const trackArtistEvent = (artistId: string) => {
@@ -743,7 +688,9 @@ export default function HomeClient({
       setAllArtists(nextArtists);
       setArtistCount(nextArtists.length);
       setArtistRandomOrder(createRandomOrderMap(nextArtists));
-      setHeroDecorations(pickHeroDecorations(nextArtists));
+      setHeroDecorations((current) =>
+        current.length > 0 ? current : pickInitialHeroDecorations(nextArtists)
+      );
 
       const hotArtists = sortProfileFirst(nextArtists.filter((artist) => artist.is_trending)).slice(0, 8);
       setFeaturedHotArtists(hotArtists);
@@ -871,6 +818,7 @@ export default function HomeClient({
       ),
     [allArtists]
   );
+  const featuredInstagramArtists = allArtists;
   const featuredWeeklyGrowthArtists = useMemo(() => {
     const sortedByGrowth = allArtists.filter((artist) => artist.is_weekly_comparable !== false).sort((a, b) => {
       const aGrowth = getWeeklyGrowthValue(a, growthMetric, growthValueMode);
@@ -1039,11 +987,7 @@ export default function HomeClient({
         </div>
       </nav>
 
-      <main className="mx-auto w-full max-w-[1520px] xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
-        <aside className="hidden xl:block">
-          <AdSidebarPlaceholder />
-        </aside>
-
+      <main className="mx-auto w-full max-w-[1600px]">
         <div className="min-w-0">
           <section className="relative overflow-hidden px-5 pb-12 pt-16 text-center">
             {/*
@@ -1329,9 +1273,15 @@ export default function HomeClient({
             />
           ) : null}
 
-          {!isSearching && featuredNewArtists.length > 0 ? <SectionBannerAd /> : null}
+          {!isSearching ? (
+            <InstagramArtistShowcase
+              artists={featuredInstagramArtists}
+              onArtistClick={(artist) => openArtistModal(artist)}
+            />
+          ) : null}
 
-          <section ref={searchResultsRef} className="mx-auto max-w-[1440px] px-5 pb-20 md:px-8">
+          {isSearching ? (
+            <section ref={searchResultsRef} className="mx-auto max-w-[1440px] px-5 pb-20 md:px-8">
             <div className="mb-5 flex items-baseline justify-between">
               <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#1a1a1a]">
                 {gridTitle}
@@ -1435,28 +1385,10 @@ export default function HomeClient({
               </div>
             )}
 
-            {!showLoadingState && !isSearching && artistCount > 0 ? (
-              <div className="pt-6">
-                {hasMoreArtists ? (
-                  <>
-                    <div ref={loadMoreRef} className="h-8 w-full" />
-                    <p className="text-center text-sm text-[#a0a0a0]">
-                      아래로 더 내리면 작가를 더 불러와요
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-center text-sm text-[#a0a0a0]">
-                    모든 작가를 확인했어요
-                  </p>
-                )}
-              </div>
-            ) : null}
-          </section>
+            </section>
+          ) : null}
         </div>
 
-        <aside className="hidden xl:block">
-          <RightAdSidebar />
-        </aside>
       </main>
 
       <footer className="border-t border-[rgba(0,0,0,0.07)] py-10 text-center text-[13px] text-[#a0a0a0]">

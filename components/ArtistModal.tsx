@@ -129,7 +129,10 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
           <div className="space-y-4 p-4 md:overflow-y-auto md:p-6">
             {galleryPostUrls.length > 0 ? (
               galleryPostUrls.map((url, index) => (
-                <div key={`${artist.id}-${index}`} className="space-y-3">
+                <div
+                  key={`${artist.id}-${index}`}
+                  className="mx-auto w-full max-w-[440px] space-y-3"
+                >
                   <InstagramEmbed
                     url={url}
                     className="min-h-[220px] rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white"

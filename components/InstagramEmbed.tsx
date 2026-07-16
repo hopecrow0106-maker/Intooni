@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -16,6 +16,7 @@ type InstagramEmbedProps = {
   url: string;
   className?: string;
   compact?: boolean;
+  lazy?: boolean;
 };
 
 function normalizeInstagramUrl(url: string) {
@@ -81,13 +82,39 @@ function ensureInstagramScript(onReady?: () => void) {
 export function InstagramEmbed({
   url,
   className = "",
-  compact = false
+  compact = false,
+  lazy = false
 }: InstagramEmbedProps) {
   const embedRef = useRef<HTMLDivElement | null>(null);
   const normalizedUrl = useMemo(() => normalizeInstagramUrl(url), [url]);
+  const [shouldRender, setShouldRender] = useState(!lazy);
 
   useEffect(() => {
-    if (!normalizedUrl || !embedRef.current) {
+    if (!lazy || shouldRender || !embedRef.current) {
+      return;
+    }
+
+    if (!("IntersectionObserver" in window)) {
+      setShouldRender(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "900px 0px" }
+    );
+
+    observer.observe(embedRef.current);
+    return () => observer.disconnect();
+  }, [lazy, shouldRender]);
+
+  useEffect(() => {
+    if (!normalizedUrl || !shouldRender || !embedRef.current) {
       return;
     }
 
@@ -100,10 +127,21 @@ export function InstagramEmbed({
     const timer = window.setTimeout(processEmbeds, 120);
 
     return () => window.clearTimeout(timer);
-  }, [normalizedUrl]);
+  }, [normalizedUrl, shouldRender]);
 
   if (!normalizedUrl) {
     return null;
+  }
+
+  if (!shouldRender) {
+    return (
+      <div
+        ref={embedRef}
+        className={`flex min-h-[520px] items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 ${className}`}
+      >
+        <span className="text-sm font-medium text-slate-400">게시물을 불러오는 중...</span>
+      </div>
+    );
   }
 
   return (
