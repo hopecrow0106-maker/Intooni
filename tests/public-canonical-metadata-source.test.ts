@@ -33,4 +33,16 @@ describe("public canonical metadata", () => {
     expect(homeSource).toContain("{artists.map((artist) => (");
     expect(homeSource).not.toContain("artists.slice(0, 100)");
   });
+
+  it("publishes a versioned wide social preview image for the home page", () => {
+    const layoutSource = readSource("app/layout.tsx");
+    const homeSource = readSource("app/page.tsx");
+
+    expect(layoutSource).toContain("/og-home-v2.png");
+    expect(layoutSource).toContain("width: 1200");
+    expect(layoutSource).toContain("height: 630");
+    expect(homeSource).toContain("homeOgImageUrl");
+    expect(homeSource).toContain("images: [");
+    expect(homeSource).toContain('card: "summary_large_image"');
+  });
 });

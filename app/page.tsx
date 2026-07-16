@@ -10,12 +10,26 @@ import type { Category } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const homeOgImageUrl = `${CANONICAL_SITE_URL}/og-home-v2.png`;
+
 export const metadata: Metadata = {
   alternates: {
     canonical: CANONICAL_SITE_URL
   },
   openGraph: {
-    url: CANONICAL_SITE_URL
+    url: CANONICAL_SITE_URL,
+    images: [
+      {
+        url: homeOgImageUrl,
+        width: 1200,
+        height: 630,
+        alt: "인투니 - 기억 안 나는 인스타툰 찾기"
+      }
+    ]
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [homeOgImageUrl]
   }
 };
 
