@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
+const layoutSource = readFileSync(path.join(root, "app/layout.tsx"), "utf8");
 const homeSource = readFileSync(path.join(root, "components/home/HomeClient.tsx"), "utf8");
 const cardSource = readFileSync(path.join(root, "components/ArtistCard.tsx"), "utf8");
 const instagramShowcaseSource = readFileSync(
@@ -16,6 +17,11 @@ describe("home SSR rendering contracts", () => {
     expect(homeSource).toContain("createInitialOrderMap(initialHomeArtists)");
     expect(homeSource).toContain("pickInitialHeroDecorations(initialHomeArtists)");
     expect(homeSource).not.toContain("return shuffleItems(uniqueTags)");
+  });
+
+  it("prevents third-party embeds from creating page-level horizontal overflow", () => {
+    expect(layoutSource).toContain("overflow-x-hidden antialiased");
+    expect(instagramShowcaseSource).toContain("min-w-0 max-w-full overflow-hidden");
   });
 
   it("keeps the first hero characters stable while initial data refreshes", () => {
@@ -65,10 +71,10 @@ describe("home SSR rendering contracts", () => {
     expect(homeSource).toContain("<InstagramArtistFeatureCard");
     expect(homeSource).not.toContain("AdSidebarPlaceholder");
     expect(homeSource).not.toContain("SectionBannerAd");
-    expect(instagramShowcaseSource).toContain("PAGE_SIZE = 30");
+    expect(instagramShowcaseSource).toContain("PAGE_SIZE = 28");
     expect(instagramShowcaseSource).toContain("IntersectionObserver");
     expect(instagramShowcaseSource).not.toContain("{pageIndex + 1}페이지");
-    expect(instagramShowcaseSource).toContain("다음 30명의 게시물을 불러오는 중");
+    expect(instagramShowcaseSource).toContain("다음 28명의 게시물을 불러오는 중");
   });
 
   it("labels count-based growth as increase count", () => {

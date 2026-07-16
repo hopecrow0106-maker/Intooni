@@ -137,7 +137,7 @@ export function InstagramEmbed({
     return (
       <div
         ref={embedRef}
-        className={`flex min-h-[520px] items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 ${className}`}
+        className={`flex min-h-[520px] min-w-0 max-w-full items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 ${className}`}
       >
         <span className="text-sm font-medium text-slate-400">게시물을 불러오는 중...</span>
       </div>
@@ -147,7 +147,7 @@ export function InstagramEmbed({
   return (
     <div
       ref={embedRef}
-      className={`overflow-hidden rounded-[24px] border border-slate-200 bg-white ${className}`}
+      className={`min-w-0 max-w-full overflow-hidden rounded-[24px] border border-slate-200 bg-white ${className}`}
     >
       <blockquote
         className="instagram-media !m-0 !min-w-0 !max-w-none"

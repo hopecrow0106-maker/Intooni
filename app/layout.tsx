@@ -94,7 +94,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className={`${jakartaSans.variable} ${notoKr.variable}`}>
       <body
-        className="antialiased"
+        className="overflow-x-hidden antialiased"
         style={{
           fontFamily:
             "var(--font-kr), var(--font-sans), -apple-system, BlinkMacSystemFont, sans-serif"

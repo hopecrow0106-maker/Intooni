@@ -14,7 +14,7 @@ type InstagramArtistShowcaseProps = {
   onArtistClick: (artist: Artist) => void;
 };
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 28;
 
 function formatCount(value: number) {
   if (Math.abs(value) >= 1_000_000) {
@@ -45,7 +45,7 @@ export function InstagramArtistFeatureCard({
   const visibleTags = artist.hashtags.slice(0, 3);
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(49,46,129,0.06)]">
+    <article className="min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(49,46,129,0.06)]">
       <div className="bg-slate-50 p-2">
         {postUrl ? (
           <InstagramEmbed url={postUrl} lazy className="!rounded-lg !border-0" />
@@ -194,7 +194,7 @@ export function InstagramArtistShowcase({
         <div ref={loadMoreRef} className="mt-8 flex min-h-20 items-center justify-center">
           <span className="inline-flex items-center gap-2 text-sm font-semibold text-violet-600">
             <Sparkles aria-hidden="true" className="h-4 w-4" />
-            다음 30명의 게시물을 불러오는 중...
+            다음 28명의 게시물을 불러오는 중...
           </span>
         </div>
       ) : (
