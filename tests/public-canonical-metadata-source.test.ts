@@ -45,4 +45,14 @@ describe("public canonical metadata", () => {
     expect(homeSource).toContain("images: [");
     expect(homeSource).toContain('card: "summary_large_image"');
   });
+
+  it("marks the square Intooni wordmark as the preferred search-result image", () => {
+    const homeSource = readSource("app/page.tsx");
+
+    expect(homeSource).toContain("/intooni-search-thumbnail-v1.png");
+    expect(homeSource).toContain('"@type": "WebPage"');
+    expect(homeSource).toContain("primaryImageOfPage");
+    expect(homeSource).toContain("thumbnailUrl: homeSearchThumbnailUrl");
+    expect(homeSource).toContain('type="application/ld+json"');
+  });
 });
