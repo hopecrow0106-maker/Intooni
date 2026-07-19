@@ -148,7 +148,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1120px] px-4 py-8 md:px-6 md:py-12">
+    <main className="mx-auto w-full max-w-[1440px] px-4 py-6 md:px-8 md:py-8">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -156,44 +156,44 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
         }}
       />
       <div className="min-w-0">
-        <article className="mx-auto max-w-5xl space-y-8">
+        <article className="space-y-7">
           <div>
             <ArtistBackButton />
           </div>
 
-          <div className="grid gap-6 overflow-hidden rounded-[28px] border border-[rgba(0,0,0,0.08)] bg-white p-5 shadow-[0_16px_40px_rgba(0,0,0,0.06)] md:grid-cols-[340px_minmax(0,1fr)] md:p-8">
+          <div className="grid gap-6 overflow-hidden rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-white p-5 shadow-[0_16px_40px_rgba(0,0,0,0.06)] md:grid-cols-[220px_minmax(0,1fr)] md:p-6 lg:grid-cols-[220px_minmax(0,1fr)_minmax(300px,0.72fr)] lg:items-start lg:gap-8">
             {artist.thumbnail_url ? (
-              <div className="relative aspect-square overflow-hidden rounded-[24px] bg-[#f2f0ec]">
+              <div className="relative aspect-square w-full max-w-[320px] overflow-hidden rounded-[18px] bg-[#f2f0ec] md:max-w-[220px]">
                 <Image
                   src={artist.thumbnail_url}
                   alt={artist.name}
                   fill
                   className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 340px"
+                  sizes="(max-width: 768px) 100vw, 220px"
                   priority
                 />
               </div>
             ) : fallbackInstagramUrl ? (
               <InstagramEmbed
                 url={fallbackInstagramUrl}
-                className="min-h-[420px] rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.05)]"
+                className="min-h-[320px] rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.05)]"
               />
             ) : (
-              <div className="relative aspect-square overflow-hidden rounded-[24px] bg-[#f2f0ec]">
+              <div className="relative aspect-square w-full max-w-[320px] overflow-hidden rounded-[18px] bg-[#f2f0ec] md:max-w-[220px]">
                 <Image
                   src={ARTIST_SQUARE_PLACEHOLDER}
                   alt={artist.name}
                   fill
                   className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 340px"
+                  sizes="(max-width: 768px) 100vw, 220px"
                   priority
                 />
               </div>
             )}
 
-            <div className="space-y-5">
+            <div className="min-w-0 space-y-4">
               <div className="space-y-3">
-                <h1 className="text-3xl font-extrabold tracking-[-0.04em] text-[#1a1a1a] md:text-5xl">
+                <h1 className="text-3xl font-extrabold text-[#1a1a1a] md:text-4xl">
                   {artist.name}
                 </h1>
                 <p className="text-base font-medium text-[#8a8a8a]">{artist.category} 작가</p>
@@ -209,7 +209,18 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <section className="border-t border-[rgba(0,0,0,0.08)] pt-4">
+                <h2 className="text-sm font-bold text-[#1a1a1a]">작가 소개</h2>
+                {artist.bio.trim() ? (
+                  <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#4b4b4b]">
+                    {artist.bio}
+                  </p>
+                ) : null}
+              </section>
+            </div>
+
+            <div className="space-y-4 md:col-span-2 lg:col-span-1">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-4">
                   <p className="text-[11px] text-[#a0a0a0]">팔로워</p>
                   <p className="mt-1 inline-flex items-center gap-2 text-xl font-bold text-[#1a1a1a]">
@@ -234,15 +245,6 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                 </div>
               </div>
 
-              <section className="rounded-[20px] border border-[rgba(0,0,0,0.08)] bg-white px-4 py-4">
-                <h2 className="text-sm font-bold text-[#1a1a1a]">작가 소개</h2>
-                {artist.bio.trim() ? (
-                  <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[#4b4b4b]">
-                    {artist.bio}
-                  </p>
-                ) : null}
-              </section>
-
               <TrackedArtistActionLink
                 artistId={artist.id}
                 eventType="instagram_outbound"
@@ -255,9 +257,12 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
           </div>
 
           <section className="space-y-4">
-            <h2 className="text-2xl font-bold tracking-[-0.03em] text-[#1a1a1a]">인스타 게시물</h2>
+            <div className="flex items-baseline gap-3">
+              <h2 className="text-2xl font-bold text-[#1a1a1a]">인스타 게시물</h2>
+              <span className="text-sm font-medium text-slate-400">총 {galleryPostUrls.length}개</span>
+            </div>
             {galleryPostUrls.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {galleryPostUrls.map((url, index) => (
                   <div key={`${artist.id}-${index}`} className="space-y-2">
                     <InstagramEmbed
@@ -268,7 +273,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                       artistId={artist.id}
                       eventType="instagram_outbound"
                       href={url}
-                      className="inline-flex rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-[#ff4d6d] hover:text-[#c9153d]"
+                      className="inline-flex rounded-full bg-[#ff4d6d] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#e83a5a]"
                     >
                       게시물 보러가기
                     </TrackedArtistActionLink>

@@ -85,7 +85,7 @@ describe("artist detail page source", () => {
     expect(pageSource).not.toContain("AdSidebarPlaceholder");
     expect(pageSource).not.toContain("광고 영역");
     expect(pageSource).not.toContain("grid-cols-[160px_minmax(0,1fr)_160px]");
-    expect(pageSource).toContain('max-w-[1120px]');
+    expect(pageSource).toContain('max-w-[1440px]');
   });
 
   it("uses the same line icons as the public artist cards for follower and post counts", () => {
@@ -95,5 +95,14 @@ describe("artist detail page source", () => {
     expect(pageSource).toContain("strokeWidth={2.2}");
     expect(pageSource).not.toContain("👥");
     expect(pageSource).not.toContain("📚");
+  });
+
+  it("uses a compact three-column desktop profile and a four-column post grid", () => {
+    expect(pageSource).toContain(
+      "lg:grid-cols-[220px_minmax(0,1fr)_minmax(300px,0.72fr)]"
+    );
+    expect(pageSource).toContain("md:max-w-[220px]");
+    expect(pageSource).toContain("md:col-span-2 lg:col-span-1");
+    expect(pageSource).toContain("sm:grid-cols-2 xl:grid-cols-4");
   });
 });
