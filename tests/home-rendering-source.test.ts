@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const layoutSource = readFileSync(path.join(root, "app/layout.tsx"), "utf8");
+const homePageSource = readFileSync(path.join(root, "app/page.tsx"), "utf8");
 const homeSource = readFileSync(path.join(root, "components/home/HomeClient.tsx"), "utf8");
 const cardSource = readFileSync(path.join(root, "components/ArtistCard.tsx"), "utf8");
 const instagramShowcaseSource = readFileSync(
@@ -13,9 +14,12 @@ const instagramShowcaseSource = readFileSync(
 );
 
 describe("home SSR rendering contracts", () => {
-  it("uses deterministic initial ordering before client-side randomization", () => {
+  it("uses one server-generated order for the initial HTML and hydrated client", () => {
+    expect(homePageSource).toContain("shuffleForInitialRender");
+    expect(homePageSource).toContain("initialArtists={shuffledArtists}");
     expect(homeSource).toContain("createInitialOrderMap(initialHomeArtists)");
     expect(homeSource).toContain("pickInitialHeroDecorations(initialHomeArtists)");
+    expect(homeSource).not.toContain("setArtistRandomOrder(createRandomOrderMap(initialHomeArtists))");
     expect(homeSource).not.toContain("return shuffleItems(uniqueTags)");
   });
 
@@ -24,12 +28,11 @@ describe("home SSR rendering contracts", () => {
     expect(instagramShowcaseSource).toContain("min-w-0 max-w-full overflow-hidden");
   });
 
-  it("randomizes hero characters once per browser refresh", () => {
-    expect(homeSource).toContain("pickRandomHeroDecorations");
-    expect(homeSource).toContain("hasRandomizedHeroRef");
-    expect(homeSource).toContain("setHeroDecorations(randomizedDecorations)");
+  it("keeps server-selected hero characters stable after hydration", () => {
+    expect(homeSource).not.toContain("pickRandomHeroDecorations");
+    expect(homeSource).not.toContain("hasRandomizedHeroRef");
     expect(homeSource).toContain(
-      "current.length > 0 ? current : pickInitialHeroDecorations(nextArtists)"
+      "pickInitialHeroDecorations(shuffleItems(nextArtists))"
     );
   });
 
@@ -38,6 +41,7 @@ describe("home SSR rendering contracts", () => {
     expect(homeSource).toContain("scheduleNextHourlyShuffle");
     expect(homeSource).toContain("nextHour.setMinutes(60, 0, 0)");
     expect(homeSource).toContain("setInstagramArtistOrder(createRandomOrderMap(allArtists))");
+    expect(homeSource).not.toContain("shuffleInstagramArtists();\n    scheduleNextHourlyShuffle();");
   });
 
   it("renders a real artist detail link in every artist card", () => {

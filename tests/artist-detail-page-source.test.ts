@@ -80,4 +80,20 @@ describe("artist detail page source", () => {
     expect(pageSource).not.toContain("search_tags");
     expect(pageSource).toContain('artist.bio.replace(/\\s+/g, " ").trim()');
   });
+
+  it("does not render empty advertising sidebars around the artist profile", () => {
+    expect(pageSource).not.toContain("AdSidebarPlaceholder");
+    expect(pageSource).not.toContain("광고 영역");
+    expect(pageSource).not.toContain("grid-cols-[160px_minmax(0,1fr)_160px]");
+    expect(pageSource).toContain('max-w-[1120px]');
+  });
+
+  it("uses the same line icons as the public artist cards for follower and post counts", () => {
+    expect(pageSource).toContain('import { Images, UsersRound } from "lucide-react"');
+    expect(pageSource).toContain("<UsersRound");
+    expect(pageSource).toContain("<Images");
+    expect(pageSource).toContain("strokeWidth={2.2}");
+    expect(pageSource).not.toContain("👥");
+    expect(pageSource).not.toContain("📚");
+  });
 });

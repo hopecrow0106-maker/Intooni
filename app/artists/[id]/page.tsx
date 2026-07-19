@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
+import { Images, UsersRound } from "lucide-react";
 
 import { ArtistBackButton } from "@/components/ArtistBackButton";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
@@ -33,14 +34,6 @@ function formatCount(value: number) {
 
 function formatOptionalCount(value: number | null) {
   return value === null ? "-" : formatCount(value);
-}
-
-function AdSidebarPlaceholder() {
-  return (
-    <div className="sticky top-20 flex min-h-[600px] w-[160px] items-center justify-center rounded-lg bg-gray-100">
-      <span className="rotate-90 text-xs text-gray-400">광고 영역</span>
-    </div>
-  );
 }
 
 function normalizeArtistSlug(value: string) {
@@ -155,17 +148,13 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1520px] px-4 py-8 md:px-6 md:py-12 xl:grid xl:grid-cols-[160px_minmax(0,1fr)_160px] xl:gap-8 xl:px-6">
+    <main className="mx-auto w-full max-w-[1120px] px-4 py-8 md:px-6 md:py-12">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(structuredData).replace(/</g, "\\u003c")
         }}
       />
-      <aside className="hidden xl:block">
-        <AdSidebarPlaceholder />
-      </aside>
-
       <div className="min-w-0">
         <article className="mx-auto max-w-5xl space-y-8">
           <div>
@@ -223,14 +212,24 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-4">
                   <p className="text-[11px] text-[#a0a0a0]">팔로워</p>
-                  <p className="mt-1 text-xl font-bold text-[#1a1a1a]">
-                    👥 {formatOptionalCount(artist.stats.followers)}
+                  <p className="mt-1 inline-flex items-center gap-2 text-xl font-bold text-[#1a1a1a]">
+                    <UsersRound
+                      aria-hidden="true"
+                      className="h-[20px] w-[20px] text-slate-700"
+                      strokeWidth={2.2}
+                    />
+                    {formatOptionalCount(artist.stats.followers)}
                   </p>
                 </div>
                 <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-4">
                   <p className="text-[11px] text-[#a0a0a0]">게시물 수</p>
-                  <p className="mt-1 text-xl font-bold text-[#1a1a1a]">
-                    📚 {formatOptionalCount(artist.stats.post_count)}
+                  <p className="mt-1 inline-flex items-center gap-2 text-xl font-bold text-[#1a1a1a]">
+                    <Images
+                      aria-hidden="true"
+                      className="h-[20px] w-[20px] text-slate-700"
+                      strokeWidth={2.2}
+                    />
+                    {formatOptionalCount(artist.stats.post_count)}
                   </p>
                 </div>
               </div>
@@ -285,9 +284,6 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
         </article>
       </div>
 
-      <aside className="hidden xl:block">
-        <AdSidebarPlaceholder />
-      </aside>
     </main>
   );
 }

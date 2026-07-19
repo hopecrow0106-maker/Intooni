@@ -208,18 +208,6 @@ function pickInitialHeroDecorations(artists: Artist[]): HeroDecoration[] {
     }));
 }
 
-function pickRandomHeroDecorations(artists: Artist[]): HeroDecoration[] {
-  return shuffleItems(artists.filter((artist) => artist.character_url.trim()))
-    .slice(0, 4)
-    .map((artist, index) => ({
-      artist,
-      duration: 7,
-      delay: HERO_DELAYS[index] ?? "0s",
-      driftX: index % 2 === 0 ? 12 : -12,
-      driftY: 12
-    }));
-}
-
 function pickRandomArtist(artists: Artist[]) {
   return artists.length > 0 ? artists[Math.floor(Math.random() * artists.length)] : null;
 }
@@ -589,16 +577,11 @@ export default function HomeClient({
   const [typedInquiryText, setTypedInquiryText] = useState("");
   const [growthMetric, setGrowthMetric] = useState<GrowthMetric>("followers");
   const [growthValueMode, setGrowthValueMode] = useState<GrowthValueMode>("count");
-  const hasRandomizedHeroRef = useRef(false);
   const lastLoggedSearchRef = useRef("");
   const searchResultsRef = useRef<HTMLElement | null>(null);
 
   const hasTextSearch = search.trim().length > 0;
   const isSearching = search.trim().length > 0 || activeGenres.length > 0 || activeFollowerRanges.length > 0;
-
-  useEffect(() => {
-    setArtistRandomOrder(createRandomOrderMap(initialHomeArtists));
-  }, [initialHomeArtists]);
 
   useEffect(() => {
     if (allArtists.length === 0) {
@@ -622,7 +605,6 @@ export default function HomeClient({
       }, nextHour.getTime() - now.getTime());
     };
 
-    shuffleInstagramArtists();
     scheduleNextHourlyShuffle();
 
     return () => {
@@ -708,20 +690,6 @@ export default function HomeClient({
   };
 
   useEffect(() => {
-    if (hasRandomizedHeroRef.current || allArtists.length === 0) {
-      return;
-    }
-
-    const randomizedDecorations = pickRandomHeroDecorations(allArtists);
-    if (randomizedDecorations.length === 0) {
-      return;
-    }
-
-    setHeroDecorations(randomizedDecorations);
-    hasRandomizedHeroRef.current = true;
-  }, [allArtists]);
-
-  useEffect(() => {
     let mounted = true;
 
     const fetchInitialData = async () => {
@@ -749,9 +717,16 @@ export default function HomeClient({
 
       setAllArtists(nextArtists);
       setArtistCount(nextArtists.length);
-      setArtistRandomOrder(createRandomOrderMap(nextArtists));
+      setArtistRandomOrder((current) =>
+        Object.keys(current).length > 0 ? current : createRandomOrderMap(nextArtists)
+      );
+      setInstagramArtistOrder((current) =>
+        Object.keys(current).length > 0 ? current : createRandomOrderMap(nextArtists)
+      );
       setHeroDecorations((current) =>
-        current.length > 0 ? current : pickInitialHeroDecorations(nextArtists)
+        current.length > 0
+          ? current
+          : pickInitialHeroDecorations(shuffleItems(nextArtists))
       );
 
       const hotArtists = sortProfileFirst(nextArtists.filter((artist) => artist.is_trending)).slice(0, 8);

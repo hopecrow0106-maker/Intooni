@@ -56,17 +56,29 @@ function artistPath(handle: string) {
   return `/artists/${encodeURIComponent(handle.replace(/^@/, "").trim())}`;
 }
 
+function shuffleForInitialRender<T>(items: T[]) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
 export default async function HomePage() {
   const [artists, categories, magazines] = await Promise.all([
     listPublicArtists().catch(() => []),
     getPublicCategories(),
     listPublicMagazines().catch(() => [])
   ]);
+  const shuffledArtists = shuffleForInitialRender(artists);
 
   return (
     <>
       <HomeClient
-        initialArtists={artists}
+        initialArtists={shuffledArtists}
         initialCategories={categories}
         initialMagazines={magazines}
       />
