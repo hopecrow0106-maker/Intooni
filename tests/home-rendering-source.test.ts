@@ -36,9 +36,7 @@ describe("home SSR rendering contracts", () => {
   it("keeps server-selected hero characters stable after hydration", () => {
     expect(homeSource).not.toContain("pickRandomHeroDecorations");
     expect(homeSource).not.toContain("hasRandomizedHeroRef");
-    expect(homeSource).toContain(
-      "pickInitialHeroDecorations(shuffleItems(nextArtists))"
-    );
+    expect(homeSource).toContain("pickInitialHeroDecorations(initialHomeHeroArtists)");
   });
 
   it("keeps artist order stable within each half hour and updates it at :00 and :30", () => {
@@ -67,10 +65,14 @@ describe("home SSR rendering contracts", () => {
     expect(homeSource).toContain("<InstagramArtistFeatureCard");
   });
 
-  it("keeps server-rendered artists when the client refresh is temporarily empty", () => {
-    expect(homeSource).toContain(
-      "const nextArtists = fetchedArtists.length > 0 ? fetchedArtists : initialHomeArtists"
-    );
+  it("uses server-rendered home data without immediately requesting the same APIs again", () => {
+    expect(homeSource).toContain("const allArtists = initialHomeArtists");
+    expect(homeSource).toContain("const categories = initialCategories");
+    expect(homeSource).toContain("const magazines = initialMagazines");
+    expect(homeSource).not.toContain('"/api/categories"');
+    expect(homeSource).not.toContain('"/api/magazines"');
+    expect(homeSource).not.toContain('"/api/public/artists"');
+    expect(homeSource).not.toContain("fetchInitialData");
   });
 
   it("shows first Instagram posts with compact artist identity and count information", () => {

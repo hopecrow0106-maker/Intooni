@@ -39,9 +39,6 @@ type HeroDecoration = {
 
 type GrowthMetric = "followers" | "posts";
 type GrowthValueMode = "count" | "rate";
-type PublicArtistsResponse = {
-  artists?: PublicArtistDTO[];
-};
 type HomeClientProps = {
   initialArtists?: PublicArtistDTO[];
   initialHeroArtists?: PublicArtistDTO[];
@@ -85,18 +82,6 @@ function publicArtistToHomeArtist(artist: PublicArtistDTO): Artist {
       artist.stats.latest_recorded_date ?? artist.updated_at ?? artist.created_at,
     created_at: artist.created_at
   };
-}
-
-async function fetchJson<T>(url: string, fallback: T): Promise<T> {
-  const response = await fetch(url, {
-    cache: "no-store"
-  });
-
-  if (!response.ok) {
-    return fallback;
-  }
-
-  return (await response.json()) as T;
 }
 
 function matchesFollowerRange(value: number, range: FollowerRangeKey) {
@@ -542,7 +527,7 @@ export default function HomeClient({
       ),
     [initialArtists, initialHeroArtists]
   );
-  const [allArtists, setAllArtists] = useState<Artist[]>(initialHomeArtists);
+  const allArtists = initialHomeArtists;
   const [searchArtists, setSearchArtists] = useState<Artist[] | null>(null);
   const [artistRandomOrder, setArtistRandomOrder] = useState<Record<string, number>>(() =>
     createInitialOrderMap(initialHomeArtists)
@@ -550,22 +535,25 @@ export default function HomeClient({
   const [instagramArtistOrder, setInstagramArtistOrder] = useState<Record<string, number>>(() =>
     createInitialOrderMap(initialHomeArtists)
   );
-  const [artistCount, setArtistCount] = useState(initialHomeArtists.length);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [genreCounts, setGenreCounts] = useState<Record<string, number>>(() =>
-    initialHomeArtists.reduce<Record<string, number>>((acc, artist) => {
-      acc[artist.genre] = (acc[artist.genre] ?? 0) + 1;
-      return acc;
-    }, {})
+  const artistCount = initialHomeArtists.length;
+  const categories = initialCategories;
+  const genreCounts = useMemo(
+    () =>
+      initialHomeArtists.reduce<Record<string, number>>((acc, artist) => {
+        acc[artist.genre] = (acc[artist.genre] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [initialHomeArtists]
   );
-  const [magazines, setMagazines] = useState<PublicMagazineDTO[]>(initialMagazines);
+  const magazines = initialMagazines;
   const [heroDecorations, setHeroDecorations] = useState<HeroDecoration[]>(() =>
     pickInitialHeroDecorations(initialHomeHeroArtists)
   );
-  const [featuredHotArtists, setFeaturedHotArtists] = useState<Artist[]>(() =>
-    sortProfileFirst(initialHomeArtists.filter((artist) => artist.is_trending)).slice(0, 8)
+  const featuredHotArtists = useMemo(
+    () => sortProfileFirst(initialHomeArtists.filter((artist) => artist.is_trending)).slice(0, 8),
+    [initialHomeArtists]
   );
-  const [loading, setLoading] = useState(initialHomeArtists.length === 0);
+  const loading = false;
   const [searchLoading, setSearchLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [activeGenres, setActiveGenres] = useState<string[]>([]);
@@ -693,56 +681,6 @@ export default function HomeClient({
 
     rollNext();
   };
-
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchInitialData = async () => {
-      setLoading(true);
-
-      const [categoriesResponse, magazinesResponse, artistsResponse] = await Promise.all([
-        fetchJson<Category[]>("/api/categories", []),
-        fetchJson<PublicMagazineDTO[]>("/api/magazines", []),
-        fetchJson<PublicArtistsResponse>("/api/public/artists", { artists: [] })
-      ]);
-
-      if (!mounted) {
-        return;
-      }
-
-      setCategories(categoriesResponse);
-      const fetchedArtists = (artistsResponse.artists ?? []).map(publicArtistToHomeArtist);
-      const nextArtists = fetchedArtists.length > 0 ? fetchedArtists : initialHomeArtists;
-      const counts = nextArtists.reduce<Record<string, number>>((acc, artist) => {
-        acc[artist.genre] = (acc[artist.genre] ?? 0) + 1;
-        return acc;
-      }, {});
-      setGenreCounts(counts);
-      setMagazines(magazinesResponse);
-
-      setAllArtists(nextArtists);
-      setArtistCount(nextArtists.length);
-      const nextHalfHourlyOrder = createHalfHourlyOrderMap(nextArtists);
-      setArtistRandomOrder(nextHalfHourlyOrder);
-      setInstagramArtistOrder(nextHalfHourlyOrder);
-      setHeroDecorations((current) =>
-        current.length > 0
-          ? current
-          : pickInitialHeroDecorations(shuffleItems(nextArtists))
-      );
-
-      const hotArtists = sortProfileFirst(nextArtists.filter((artist) => artist.is_trending)).slice(0, 8);
-      setFeaturedHotArtists(hotArtists);
-
-      setLoading(false);
-    };
-
-    void fetchInitialData();
-
-    return () => {
-      mounted = false;
-    };
-  }, [initialHomeArtists]);
 
   useEffect(() => {
     if (!showInquiryModal) {

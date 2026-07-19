@@ -171,9 +171,8 @@ export function InstagramArtistShowcase({
     >
       <div className="mb-7 flex items-end justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-2xl font-extrabold text-slate-950 md:text-[30px]">
-            인스타 게시물로 보는 작가
-            <Sparkles aria-hidden="true" className="h-6 w-6 text-violet-500" strokeWidth={2} />
+          <h2 className="text-2xl font-extrabold text-slate-950 md:text-[30px]">
+            인스타툰 미리보기
           </h2>
           <p className="mt-2 text-sm text-slate-500 md:text-base">
             작가들의 첫 번째 대표 게시물과 프로필 정보를 함께 살펴보세요.
