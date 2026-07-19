@@ -163,7 +163,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
 
           <div className="grid gap-6 overflow-hidden rounded-[24px] border border-[rgba(0,0,0,0.08)] bg-white p-5 shadow-[0_16px_40px_rgba(0,0,0,0.06)] md:grid-cols-[220px_minmax(0,1fr)] md:p-6 lg:grid-cols-[220px_minmax(0,1fr)_minmax(300px,0.72fr)] lg:items-start lg:gap-8">
             {artist.thumbnail_url ? (
-              <div className="relative aspect-square w-full max-w-[320px] overflow-hidden rounded-[18px] bg-[#f2f0ec] md:max-w-[220px]">
+              <div className="relative mx-auto aspect-square w-full max-w-[180px] overflow-hidden rounded-[18px] bg-[#f2f0ec] sm:max-w-[220px] md:mx-0">
                 <Image
                   src={artist.thumbnail_url}
                   alt={artist.name}
@@ -179,7 +179,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                 className="min-h-[320px] rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-white shadow-[0_12px_28px_rgba(0,0,0,0.05)]"
               />
             ) : (
-              <div className="relative aspect-square w-full max-w-[320px] overflow-hidden rounded-[18px] bg-[#f2f0ec] md:max-w-[220px]">
+              <div className="relative mx-auto aspect-square w-full max-w-[180px] overflow-hidden rounded-[18px] bg-[#f2f0ec] sm:max-w-[220px] md:mx-0">
                 <Image
                   src={ARTIST_SQUARE_PLACEHOLDER}
                   alt={artist.name}

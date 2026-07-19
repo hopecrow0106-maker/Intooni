@@ -101,7 +101,8 @@ describe("artist detail page source", () => {
     expect(pageSource).toContain(
       "lg:grid-cols-[220px_minmax(0,1fr)_minmax(300px,0.72fr)]"
     );
-    expect(pageSource).toContain("md:max-w-[220px]");
+    expect(pageSource).toContain("max-w-[180px]");
+    expect(pageSource).toContain("sm:max-w-[220px]");
     expect(pageSource).toContain("md:col-span-2 lg:col-span-1");
     expect(pageSource).toContain("sm:grid-cols-2 xl:grid-cols-4");
   });
