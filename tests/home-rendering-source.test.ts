@@ -12,13 +12,18 @@ const instagramShowcaseSource = readFileSync(
   path.join(root, "components/InstagramArtistShowcase.tsx"),
   "utf8"
 );
+const instagramEmbedSource = readFileSync(
+  path.join(root, "components/InstagramEmbed.tsx"),
+  "utf8"
+);
 
 describe("home SSR rendering contracts", () => {
   it("uses one server-generated order for the initial HTML and hydrated client", () => {
-    expect(homePageSource).toContain("shuffleForInitialRender");
-    expect(homePageSource).toContain("initialArtists={shuffledArtists}");
+    expect(homePageSource).toContain("orderArtistsForHalfHour");
+    expect(homePageSource).toContain("initialArtists={orderedArtists}");
+    expect(homePageSource).toContain("initialHeroArtists={heroArtists}");
     expect(homeSource).toContain("createInitialOrderMap(initialHomeArtists)");
-    expect(homeSource).toContain("pickInitialHeroDecorations(initialHomeArtists)");
+    expect(homeSource).toContain("pickInitialHeroDecorations(initialHomeHeroArtists)");
     expect(homeSource).not.toContain("setArtistRandomOrder(createRandomOrderMap(initialHomeArtists))");
     expect(homeSource).not.toContain("return shuffleItems(uniqueTags)");
   });
@@ -36,12 +41,13 @@ describe("home SSR rendering contracts", () => {
     );
   });
 
-  it("reshuffles the Instagram artist showcase at the top of every hour", () => {
+  it("keeps artist order stable within each half hour and updates it at :00 and :30", () => {
     expect(homeSource).toContain("instagramArtistOrder");
-    expect(homeSource).toContain("scheduleNextHourlyShuffle");
-    expect(homeSource).toContain("nextHour.setMinutes(60, 0, 0)");
-    expect(homeSource).toContain("setInstagramArtistOrder(createRandomOrderMap(allArtists))");
-    expect(homeSource).not.toContain("shuffleInstagramArtists();\n    scheduleNextHourlyShuffle();");
+    expect(homeSource).toContain("scheduleNextHalfHourlyShuffle");
+    expect(homeSource).toContain("millisecondsUntilNextHalfHour()");
+    expect(homeSource).toContain("createHalfHourlyOrderMap(allArtists)");
+    expect(homeSource).toContain("setArtistRandomOrder(nextOrder)");
+    expect(homeSource).toContain("setInstagramArtistOrder(nextOrder)");
   });
 
   it("renders a real artist detail link in every artist card", () => {
@@ -88,6 +94,17 @@ describe("home SSR rendering contracts", () => {
     expect(instagramShowcaseSource).toContain("IntersectionObserver");
     expect(instagramShowcaseSource).not.toContain("{pageIndex + 1}페이지");
     expect(instagramShowcaseSource).toContain("다음 28명의 게시물을 불러오는 중");
+  });
+
+  it("loads only the first eight showcase embeds eagerly and batches Instagram processing", () => {
+    expect(instagramShowcaseSource).toContain("INITIAL_EMBED_COUNT = 8");
+    expect(instagramShowcaseSource).toContain("eagerEmbed={globalIndex < INITIAL_EMBED_COUNT}");
+    expect(instagramShowcaseSource).toContain("lazy={!eagerEmbed}");
+    expect(instagramShowcaseSource).toContain('data-instagram-showcase="true"');
+    expect(instagramEmbedSource).toContain('rootMargin: "200px 0px"');
+    expect(instagramEmbedSource).toContain("scheduleInstagramProcess");
+    expect(instagramEmbedSource).toContain("window.clearTimeout(instagramProcessTimer)");
+    expect(instagramEmbedSource).not.toContain('rootMargin: "900px 0px"');
   });
 
   it("labels count-based growth as increase count", () => {

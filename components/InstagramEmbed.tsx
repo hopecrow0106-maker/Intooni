@@ -19,6 +19,23 @@ type InstagramEmbedProps = {
   lazy?: boolean;
 };
 
+let instagramProcessTimer: number | null = null;
+
+function scheduleInstagramProcess() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (instagramProcessTimer !== null) {
+    window.clearTimeout(instagramProcessTimer);
+  }
+
+  instagramProcessTimer = window.setTimeout(() => {
+    instagramProcessTimer = null;
+    window.instgrm?.Embeds?.process();
+  }, 120);
+}
+
 function normalizeInstagramUrl(url: string) {
   const trimmed = url.trim();
   if (!trimmed) {
@@ -106,7 +123,7 @@ export function InstagramEmbed({
           observer.disconnect();
         }
       },
-      { rootMargin: "900px 0px" }
+      { rootMargin: "200px 0px" }
     );
 
     observer.observe(embedRef.current);
@@ -118,15 +135,8 @@ export function InstagramEmbed({
       return;
     }
 
-    const processEmbeds = () => {
-      window.instgrm?.Embeds?.process();
-    };
-
-    ensureInstagramScript(processEmbeds);
-
-    const timer = window.setTimeout(processEmbeds, 120);
-
-    return () => window.clearTimeout(timer);
+    ensureInstagramScript(scheduleInstagramProcess);
+    scheduleInstagramProcess();
   }, [normalizedUrl, shouldRender]);
 
   if (!normalizedUrl) {

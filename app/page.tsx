@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import HomeClient from "@/components/home/HomeClient";
+import { orderArtistsForHalfHour } from "@/lib/half-hourly-artist-order";
 import { listPublicArtists } from "@/lib/server/public-artists";
 import { listPublicMagazines } from "@/lib/server/public-magazines";
 import { CANONICAL_SITE_URL } from "@/lib/site";
@@ -56,7 +57,7 @@ function artistPath(handle: string) {
   return `/artists/${encodeURIComponent(handle.replace(/^@/, "").trim())}`;
 }
 
-function shuffleForInitialRender<T>(items: T[]) {
+function shuffleForHeroRender<T>(items: T[]) {
   const shuffled = [...items];
 
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
@@ -73,12 +74,14 @@ export default async function HomePage() {
     getPublicCategories(),
     listPublicMagazines().catch(() => [])
   ]);
-  const shuffledArtists = shuffleForInitialRender(artists);
+  const orderedArtists = orderArtistsForHalfHour(artists);
+  const heroArtists = shuffleForHeroRender(artists);
 
   return (
     <>
       <HomeClient
-        initialArtists={shuffledArtists}
+        initialArtists={orderedArtists}
+        initialHeroArtists={heroArtists}
         initialCategories={categories}
         initialMagazines={magazines}
       />

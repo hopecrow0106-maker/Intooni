@@ -19,6 +19,10 @@ import {
 import { SearchBar } from "@/components/SearchBar";
 import type { PublicArtistDTO } from "@/lib/domain/public-artist";
 import type { PublicMagazineDTO } from "@/lib/domain/public-magazine";
+import {
+  createHalfHourlyOrderMap,
+  millisecondsUntilNextHalfHour
+} from "@/lib/half-hourly-artist-order";
 import { ARTIST_SQUARE_PLACEHOLDER, MAGAZINE_RECT_PLACEHOLDER } from "@/lib/placeholders";
 import type { Artist, Category } from "@/lib/types";
 
@@ -40,6 +44,7 @@ type PublicArtistsResponse = {
 };
 type HomeClientProps = {
   initialArtists?: PublicArtistDTO[];
+  initialHeroArtists?: PublicArtistDTO[];
   initialCategories?: Category[];
   initialMagazines?: PublicMagazineDTO[];
 };
@@ -179,13 +184,6 @@ function sortProfileFirst<T extends Artist>(artists: T[]) {
 
     return 0;
   });
-}
-
-function createRandomOrderMap(artists: Artist[]) {
-  return shuffleItems(artists).reduce<Record<string, number>>((acc, artist, index) => {
-    acc[artist.id] = index;
-    return acc;
-  }, {});
 }
 
 function createInitialOrderMap(artists: Artist[]) {
@@ -529,12 +527,20 @@ function NewArtistsSection({
 
 export default function HomeClient({
   initialArtists = [],
+  initialHeroArtists = [],
   initialCategories = [],
   initialMagazines = []
 }: HomeClientProps) {
   const initialHomeArtists = useMemo(
     () => initialArtists.map(publicArtistToHomeArtist),
     [initialArtists]
+  );
+  const initialHomeHeroArtists = useMemo(
+    () =>
+      (initialHeroArtists.length > 0 ? initialHeroArtists : initialArtists).map(
+        publicArtistToHomeArtist
+      ),
+    [initialArtists, initialHeroArtists]
   );
   const [allArtists, setAllArtists] = useState<Artist[]>(initialHomeArtists);
   const [searchArtists, setSearchArtists] = useState<Artist[] | null>(null);
@@ -554,7 +560,7 @@ export default function HomeClient({
   );
   const [magazines, setMagazines] = useState<PublicMagazineDTO[]>(initialMagazines);
   const [heroDecorations, setHeroDecorations] = useState<HeroDecoration[]>(() =>
-    pickInitialHeroDecorations(initialHomeArtists)
+    pickInitialHeroDecorations(initialHomeHeroArtists)
   );
   const [featuredHotArtists, setFeaturedHotArtists] = useState<Artist[]>(() =>
     sortProfileFirst(initialHomeArtists.filter((artist) => artist.is_trending)).slice(0, 8)
@@ -588,28 +594,27 @@ export default function HomeClient({
       return;
     }
 
-    let hourlyShuffleTimer: number | undefined;
+    let halfHourlyShuffleTimer: number | undefined;
 
-    const shuffleInstagramArtists = () => {
-      setInstagramArtistOrder(createRandomOrderMap(allArtists));
+    const applyCurrentHalfHourlyOrder = () => {
+      const nextOrder = createHalfHourlyOrderMap(allArtists);
+      setArtistRandomOrder(nextOrder);
+      setInstagramArtistOrder(nextOrder);
     };
 
-    const scheduleNextHourlyShuffle = () => {
-      const now = new Date();
-      const nextHour = new Date(now);
-      nextHour.setMinutes(60, 0, 0);
-
-      hourlyShuffleTimer = window.setTimeout(() => {
-        shuffleInstagramArtists();
-        scheduleNextHourlyShuffle();
-      }, nextHour.getTime() - now.getTime());
+    const scheduleNextHalfHourlyShuffle = () => {
+      halfHourlyShuffleTimer = window.setTimeout(() => {
+        applyCurrentHalfHourlyOrder();
+        scheduleNextHalfHourlyShuffle();
+      }, millisecondsUntilNextHalfHour());
     };
 
-    scheduleNextHourlyShuffle();
+    applyCurrentHalfHourlyOrder();
+    scheduleNextHalfHourlyShuffle();
 
     return () => {
-      if (hourlyShuffleTimer !== undefined) {
-        window.clearTimeout(hourlyShuffleTimer);
+      if (halfHourlyShuffleTimer !== undefined) {
+        window.clearTimeout(halfHourlyShuffleTimer);
       }
     };
   }, [allArtists]);
@@ -717,12 +722,9 @@ export default function HomeClient({
 
       setAllArtists(nextArtists);
       setArtistCount(nextArtists.length);
-      setArtistRandomOrder((current) =>
-        Object.keys(current).length > 0 ? current : createRandomOrderMap(nextArtists)
-      );
-      setInstagramArtistOrder((current) =>
-        Object.keys(current).length > 0 ? current : createRandomOrderMap(nextArtists)
-      );
+      const nextHalfHourlyOrder = createHalfHourlyOrderMap(nextArtists);
+      setArtistRandomOrder(nextHalfHourlyOrder);
+      setInstagramArtistOrder(nextHalfHourlyOrder);
       setHeroDecorations((current) =>
         current.length > 0
           ? current

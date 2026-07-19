@@ -15,6 +15,7 @@ type InstagramArtistShowcaseProps = {
 };
 
 const PAGE_SIZE = 28;
+const INITIAL_EMBED_COUNT = 8;
 
 function formatCount(value: number) {
   if (Math.abs(value) >= 1_000_000) {
@@ -34,10 +35,12 @@ function getFirstInstagramPost(artist: Artist) {
 
 export function InstagramArtistFeatureCard({
   artist,
-  onArtistClick
+  onArtistClick,
+  eagerEmbed = false
 }: {
   artist: Artist;
   onArtistClick: (artist: Artist) => void;
+  eagerEmbed?: boolean;
 }) {
   const postUrl = getFirstInstagramPost(artist);
   const detailHref = `/artists/${encodeURIComponent(artist.instagram_handle.replace(/^@/, "").trim())}`;
@@ -48,7 +51,11 @@ export function InstagramArtistFeatureCard({
     <article className="min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_12px_30px_rgba(49,46,129,0.06)]">
       <div className="bg-slate-50 p-2">
         {postUrl ? (
-          <InstagramEmbed url={postUrl} lazy className="!rounded-lg !border-0" />
+          <InstagramEmbed
+            url={postUrl}
+            lazy={!eagerEmbed}
+            className="!rounded-lg !border-0"
+          />
         ) : (
           <div className="flex min-h-[520px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-slate-400">
             <ImageOff aria-hidden="true" className="h-8 w-8" strokeWidth={1.6} />
@@ -158,7 +165,10 @@ export function InstagramArtistShowcase({
   if (artists.length === 0) return null;
 
   return (
-    <section className="mx-auto mb-14 max-w-[1440px] px-5 md:px-8">
+    <section
+      data-instagram-showcase="true"
+      className="mx-auto mb-14 max-w-[1440px] px-5 md:px-8"
+    >
       <div className="mb-7 flex items-end justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-extrabold text-slate-950 md:text-[30px]">
@@ -177,13 +187,18 @@ export function InstagramArtistShowcase({
           return (
             <div key={pageIndex}>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-                {pageArtists.map((artist) => (
-                  <InstagramArtistFeatureCard
-                    key={artist.id}
-                    artist={artist}
-                    onArtistClick={onArtistClick}
-                  />
-                ))}
+                {pageArtists.map((artist, artistIndex) => {
+                  const globalIndex = pageIndex * PAGE_SIZE + artistIndex;
+
+                  return (
+                    <InstagramArtistFeatureCard
+                      key={artist.id}
+                      artist={artist}
+                      onArtistClick={onArtistClick}
+                      eagerEmbed={globalIndex < INITIAL_EMBED_COUNT}
+                    />
+                  );
+                })}
               </div>
             </div>
           );
