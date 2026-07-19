@@ -23,6 +23,7 @@ type ArtistTableProps = {
   statsPeriod: ArtistStatsPeriod;
   onEdit: (artist: Artist) => void;
   onDelete: (artist: Artist) => void;
+  onToggleVisibility: (artist: Artist) => void;
   onToggleTrending: (artist: Artist) => void;
   onReorder: (artists: Artist[]) => void;
   isSaving: boolean;
@@ -116,6 +117,7 @@ export function ArtistTable({
   statsPeriod,
   onEdit,
   onDelete,
+  onToggleVisibility,
   onToggleTrending,
   onReorder,
   isSaving,
@@ -216,7 +218,11 @@ export function ArtistTable({
                         </div>
 
                         <div className="hidden xl:block">
-                          <MiniSwitch active={artist.status === "active" && artist.show_on_site === true} label="사이트 공개 상태" />
+                          <MiniSwitch
+                            active={artist.status === "active" && artist.show_on_site === true}
+                            label="사이트 공개 상태"
+                            onClick={() => onToggleVisibility(artist)}
+                          />
                         </div>
 
                         <div className="hidden xl:block">

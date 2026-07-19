@@ -79,6 +79,21 @@ describe("Admin artist write boundary", () => {
     ).toEqual(["https://www.instagram.com/reel/example/"]);
   });
 
+  it("keeps public visibility and management status consistent", () => {
+    expect(sanitizeArtistPayload({ id: "artist-1", show_on_site: true }, true)).toMatchObject({
+      show_on_site: true,
+      status: "active"
+    });
+    expect(sanitizeArtistPayload({ id: "artist-1", show_on_site: false }, true)).toMatchObject({
+      show_on_site: false,
+      status: "hidden"
+    });
+    expect(sanitizeArtistPayload({ id: "artist-1", status: "archived" }, true)).toMatchObject({
+      show_on_site: false,
+      status: "archived"
+    });
+  });
+
   it("keeps legacy statistics out of the direct artist edit form", () => {
     const source = readFileSync(
       path.join(process.cwd(), "components/admin/ArtistForm.tsx"),

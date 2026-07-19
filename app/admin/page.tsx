@@ -1501,6 +1501,38 @@ export default function AdminPage() {
     }
   };
 
+  const toggleSiteVisibility = async (artist: Artist) => {
+    const nextVisibility = !(artist.status === "active" && artist.show_on_site === true);
+    setSaving(true);
+    try {
+      const response = await fetch("/api/artists", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: artist.id,
+          show_on_site: nextVisibility
+        })
+      });
+
+      const data = (await response.json()) as { message?: string };
+
+      if (!response.ok) {
+        pushDebugError({
+          action: "사이트 공개 상태 변경",
+          source: "app/admin/page.tsx > toggleSiteVisibility",
+          endpoint: "/api/artists",
+          message: data.message ?? "사이트 공개 상태 변경에 실패했습니다."
+        });
+        return;
+      }
+
+      clearDebugErrors();
+      await fetchArtists();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const reorderArtists = async (nextArtists: Artist[]) => {
     setArtists(nextArtists);
     setSaving(true);
@@ -2694,6 +2726,7 @@ export default function AdminPage() {
                 setArtistFormOpen(true);
               }}
               onDelete={deleteArtist}
+              onToggleVisibility={toggleSiteVisibility}
               onToggleTrending={toggleTrending}
               onReorder={reorderArtists}
               isSaving={saving}

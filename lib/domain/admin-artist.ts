@@ -108,6 +108,15 @@ export function sanitizeArtistPayload(input: unknown, partial = false): AdminArt
     }
     payload.status = status as ArtistStatus;
   }
+  if (has("show_on_site")) {
+    payload.status = payload.show_on_site
+      ? "active"
+      : payload.status === "archived"
+        ? "archived"
+        : "hidden";
+  } else if (has("status")) {
+    payload.show_on_site = payload.status === "active";
+  }
   if (has("sort_order")) {
     const sortOrder = Number(raw.sort_order);
     if (!Number.isInteger(sortOrder)) throw new Error("sort_order는 정수여야 합니다.");

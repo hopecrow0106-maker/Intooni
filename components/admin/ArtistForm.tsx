@@ -136,6 +136,38 @@ function createInitialState(artist: Artist | null, categories: Category[]): Arti
   };
 }
 
+function CompactToggle({
+  label,
+  helper,
+  active,
+  onToggle,
+  activeClassName = "bg-coral"
+}: {
+  label: string;
+  helper: string;
+  active: boolean;
+  onToggle: () => void;
+  activeClassName?: string;
+}) {
+  return (
+    <div className="flex min-h-[72px] flex-col justify-between rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+      <p className="whitespace-nowrap text-xs font-semibold text-slate-700">{label}</p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <p className="min-w-0 text-[9px] leading-3 text-slate-400">{helper}</p>
+        <button
+          type="button"
+          aria-label={label}
+          aria-pressed={active}
+          onClick={onToggle}
+          className={`switch-track shrink-0 ${active ? activeClassName : "bg-slate-300"}`}
+        >
+          <span className={`switch-thumb ${active ? "translate-x-6" : "translate-x-1"}`} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function isKoreanComposing(event: ReactKeyboardEvent<HTMLInputElement>) {
   return event.nativeEvent.isComposing || event.keyCode === 229;
 }
@@ -649,144 +681,150 @@ export function ArtistForm({
             hasArtist={Boolean(initialArtist)}
           />
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">작가명</span>
-              <input
-                required
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-slate-800">기본 정보 및 공개 설정</h3>
+              <p className="mt-1 text-[11px] text-slate-400">
+                공개 상태와 홈 노출 옵션을 한곳에서 관리합니다.
+              </p>
+            </div>
 
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">인스타 계정</span>
-              <input
-                required
-                value={form.instagram_handle}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    instagram_handle: event.target.value.replace(/^@/, "")
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">요즘 뜨는 작가</span>
-              <button
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, is_trending: !current.is_trending }))}
-                className={`switch-track ${form.is_trending ? "bg-coral" : "bg-slate-300"}`}
-              >
-                <span className={`switch-thumb ${form.is_trending ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">NEW 제외</span>
-              <button
-                type="button"
-                onClick={() => setForm((current) => ({ ...current, hide_from_new: !current.hide_from_new }))}
-                className={`switch-track ${form.hide_from_new ? "bg-slate-500" : "bg-slate-300"}`}
-              >
-                <span
-                  className={`switch-thumb ${form.hide_from_new ? "translate-x-6" : "translate-x-1"}`}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-slate-600">작가명</span>
+                <input
+                  required
+                  value={form.name}
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-ink"
                 />
-              </button>
-            </label>
-          </div>
+              </label>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">관리 상태</span>
-              <select
-                value={form.status}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    status: event.target.value as ArtistFormValues["status"]
-                  }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              >
-                <option value="active">활성</option>
-                <option value="hidden">숨김</option>
-                <option value="archived">보관</option>
-              </select>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">사이트 공개</span>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm((current) => ({ ...current, show_on_site: !current.show_on_site }))
-                }
-                className={`switch-track ${form.show_on_site ? "bg-coral" : "bg-slate-300"}`}
-              >
-                <span className={`switch-thumb ${form.show_on_site ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">성장 공개</span>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm((current) => ({
-                    ...current,
-                    show_growth_on_site: !current.show_growth_on_site
-                  }))
-                }
-                className={`switch-track ${form.show_growth_on_site ? "bg-coral" : "bg-slate-300"}`}
-              >
-                <span
-                  className={`switch-thumb ${form.show_growth_on_site ? "translate-x-6" : "translate-x-1"}`}
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-slate-600">인스타 계정</span>
+                <input
+                  required
+                  value={form.instagram_handle}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      instagram_handle: event.target.value.replace(/^@/, "")
+                    }))
+                  }
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-ink"
                 />
-              </button>
-            </label>
-          </div>
+              </label>
 
-          <div className="grid gap-2 text-xs leading-5 text-slate-500 md:grid-cols-2">
-            <p className="rounded-lg bg-slate-100 px-3 py-2">
-              웹사이트 공개 OFF: 내부 DB에는 유지되지만 공개 사이트, 상세 페이지, 검색,
-              sitemap에서 제외됩니다.
-            </p>
-            <p className="rounded-lg bg-slate-100 px-3 py-2">
-              성장률 공개 OFF: 통계 수집은 계속되며 공개 사이트의 증가량과 증가율만 숨깁니다.
-            </p>
-          </div>
+              <label className="space-y-1.5 md:col-span-2 xl:col-span-1">
+                <span className="text-xs font-semibold text-slate-600">카테고리</span>
+                <select
+                  value={form.main_category_id}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, main_category_id: event.target.value }))
+                  }
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-ink"
+                >
+                  {categories.length === 0 ? (
+                    <option value="">카테고리를 먼저 추가해 주세요</option>
+                  ) : (
+                    categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium text-slate-600">카테고리</span>
-              <select
-                value={form.main_category_id}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, main_category_id: event.target.value }))
-                }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-ink"
-              >
-                {categories.length === 0 ? (
-                  <option value="">카테고리를 먼저 추가해 주세요</option>
-                ) : (
-                  categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-          </div>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="mb-2 text-[11px] font-bold uppercase text-slate-400">노출 설정</p>
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                <label className="flex min-h-[72px] flex-col justify-center rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+                  <span className="text-xs font-semibold text-slate-700">관리 상태</span>
+                  <select
+                    value={form.status}
+                    onChange={(event) =>
+                      setForm((current) => {
+                        const status = event.target.value as ArtistFormValues["status"];
 
-          <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+                        return {
+                          ...current,
+                          status,
+                          show_on_site: status === "active"
+                        };
+                      })
+                    }
+                    className="mt-1 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs outline-none focus:border-ink"
+                  >
+                    <option value="active">활성</option>
+                    <option value="hidden">숨김</option>
+                    <option value="archived">보관</option>
+                  </select>
+                </label>
+
+                <CompactToggle
+                  label="사이트 공개"
+                  helper="프로필·검색 노출"
+                  active={form.status === "active" && form.show_on_site}
+                  onToggle={() =>
+                    setForm((current) => {
+                      const showOnSite = !(current.status === "active" && current.show_on_site);
+
+                      return {
+                        ...current,
+                        show_on_site: showOnSite,
+                        status: showOnSite ? "active" : "hidden"
+                      };
+                    })
+                  }
+                />
+
+                <CompactToggle
+                  label="성장 공개"
+                  helper="증가량·증가율 노출"
+                  active={form.show_growth_on_site}
+                  onToggle={() =>
+                    setForm((current) => ({
+                      ...current,
+                      show_growth_on_site: !current.show_growth_on_site
+                    }))
+                  }
+                />
+
+                <CompactToggle
+                  label="요즘 뜨는 작가"
+                  helper="홈 추천 영역 노출"
+                  active={form.is_trending}
+                  onToggle={() =>
+                    setForm((current) => ({ ...current, is_trending: !current.is_trending }))
+                  }
+                />
+
+                <CompactToggle
+                  label="NEW 제외"
+                  helper="신규 작가 영역 제외"
+                  active={form.hide_from_new}
+                  activeClassName="bg-slate-500"
+                  onToggle={() =>
+                    setForm((current) => ({ ...current, hide_from_new: !current.hide_from_new }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-2 text-[10px] leading-4 text-slate-500 md:grid-cols-2">
+              <p className="rounded-md bg-slate-50 px-2.5 py-2">
+                웹사이트 공개 OFF: 내부 DB에는 유지되지만 공개 사이트, 상세 페이지, 검색,
+                sitemap에서 제외됩니다.
+              </p>
+              <p className="rounded-md bg-slate-50 px-2.5 py-2">
+                성장률 공개 OFF: 통계 수집은 계속되며 공개 사이트의 증가량과 증가율만 숨깁니다.
+              </p>
+            </div>
+          </section>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-700">카테고리 관리</span>
               {categoryBusy ? <span className="text-xs text-slate-400">처리 중..</span> : null}

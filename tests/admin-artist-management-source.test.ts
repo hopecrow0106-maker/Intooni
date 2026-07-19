@@ -84,4 +84,13 @@ describe("Admin artist management surface", () => {
     expect(artistForm).toContain("성장률 공개 OFF");
     expect(artistForm).toContain("통계 수집은 계속");
   });
+
+  it("wires public visibility toggles to a consistent saved status", () => {
+    expect(artistTable).toContain("onToggleVisibility");
+    expect(artistTable).toContain("onClick={() => onToggleVisibility(artist)}");
+    expect(adminPage).toContain("toggleSiteVisibility");
+    expect(adminPage).toContain("show_on_site: nextVisibility");
+    expect(artistForm).toContain('status: showOnSite ? "active" : "hidden"');
+    expect(artistForm).toContain('show_on_site: status === "active"');
+  });
 });
