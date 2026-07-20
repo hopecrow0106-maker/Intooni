@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { Images, UsersRound } from "lucide-react";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
@@ -106,11 +107,25 @@ export function ArtistModal({ artist, onClose }: ArtistModalProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-4">
                   <p className="text-[11px] text-[#a0a0a0]">팔로워</p>
-                  <p className="mt-1 text-lg font-bold text-[#1a1a1a]">👥 {formatCount(artist.followers)}</p>
+                  <p className="mt-1 inline-flex items-center gap-2 text-lg font-bold text-[#1a1a1a]">
+                    <UsersRound
+                      aria-hidden="true"
+                      className="h-[20px] w-[20px] text-slate-700"
+                      strokeWidth={2.2}
+                    />
+                    {formatCount(artist.followers)}
+                  </p>
                 </div>
                 <div className="rounded-[18px] border border-[rgba(0,0,0,0.08)] bg-[#f8f7f4] px-4 py-4">
                   <p className="text-[11px] text-[#a0a0a0]">게시물 수</p>
-                  <p className="mt-1 text-lg font-bold text-[#1a1a1a]">📚 {formatCount(artist.post_count)}</p>
+                  <p className="mt-1 inline-flex items-center gap-2 text-lg font-bold text-[#1a1a1a]">
+                    <Images
+                      aria-hidden="true"
+                      className="h-[20px] w-[20px] text-slate-700"
+                      strokeWidth={2.2}
+                    />
+                    {formatCount(artist.post_count)}
+                  </p>
                 </div>
               </div>
 
