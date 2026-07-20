@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import clsx from "clsx";
+import { Images, UsersRound } from "lucide-react";
 
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
@@ -152,10 +153,12 @@ export function ArtistCard({ artist, index, onClick, uniformHeight = true }: Art
           )}
         >
           <span className="inline-flex items-center gap-1 rounded-full bg-[#f4f0ff] px-2.5 py-1">
-            👥 {formatSocialCount(artist.followers)}
+            <UsersRound aria-hidden="true" className="h-4 w-4" strokeWidth={2.2} />
+            {formatSocialCount(artist.followers)}
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-[#f7f3ff] px-2.5 py-1 text-[#a39abf]">
-            📚 {formatSocialCount(artist.post_count)}
+            <Images aria-hidden="true" className="h-4 w-4" strokeWidth={2.2} />
+            {formatSocialCount(artist.post_count)}
           </span>
         </div>
       </div>
