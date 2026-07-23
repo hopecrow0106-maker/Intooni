@@ -113,11 +113,15 @@ describe("Admin artist internal routes", () => {
     expect(getSupabaseAdminClient).not.toHaveBeenCalled();
   });
 
-  it("stores an internal content summary on each collaboration row", async () => {
+  it("stores the simplified collaboration fields and derives legacy date columns", async () => {
     vi.mocked(isAdminAuthenticated).mockReturnValue(true);
     const single = vi.fn().mockResolvedValue({ data: { id: "collaboration-1" }, error: null });
     const select = vi.fn(() => ({ single }));
-    const insert = vi.fn(() => ({ select }));
+    let insertedPayload: unknown;
+    const insert = vi.fn((payload: unknown) => {
+      insertedPayload = payload;
+      return { select };
+    });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: vi.fn(() => ({ insert }))
     } as never);
@@ -125,14 +129,12 @@ describe("Admin artist internal routes", () => {
     const response = await saveCollaboration(
       jsonRequest("POST", {
         brand_name: "브랜드",
-        collaboration_year: 2026,
-        collaboration_month: 7,
+        brand_industry: "식품",
+        collaboration_date: "26.07.01",
         post_url: "https://www.instagram.com/p/example/",
         content_summary: "신제품 출시 릴스와 할인 코드 소개",
-        ad_disclosure_status: "yes",
         likes: 10,
-        comments: 2,
-        views: 100
+        comments: 2
       }),
       context
     );
@@ -142,10 +144,19 @@ describe("Admin artist internal routes", () => {
       expect.objectContaining({
         artist_id: context.params.id,
         brand_name: "브랜드",
+        brand_industry: "식품",
+        collaboration_date: "26.07.01",
+        collaboration_year: 2026,
+        collaboration_month: 7,
         post_url: "https://www.instagram.com/p/example/",
-        content_summary: "신제품 출시 릴스와 할인 코드 소개"
+        content_summary: "신제품 출시 릴스와 할인 코드 소개",
+        likes: 10,
+        comments: 2
       })
     );
+    const payload = insertedPayload as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("views");
+    expect(payload).not.toHaveProperty("ad_disclosure_status");
   });
 
   it("saves B2B profile and category links through one atomic RPC", async () => {

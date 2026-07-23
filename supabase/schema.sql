@@ -183,7 +183,9 @@ create table if not exists public.artist_collaborations (
   id uuid primary key default gen_random_uuid(),
   artist_id uuid not null references public.artists(id) on delete restrict,
   brand_name text not null,
+  brand_industry text not null default '',
   brand_category_id uuid references public.brand_categories(id) on delete set null,
+  collaboration_date text not null default '',
   collaboration_year smallint not null,
   collaboration_month smallint,
   post_url text not null,
@@ -545,6 +547,11 @@ comment on table public.brand_categories is '[BUSINESS] Brand and campaign indus
 comment on table public.artist_recommended_brand_categories is '[BUSINESS] Many-to-many recommendations between artists and brand categories.';
 comment on table public.artist_b2b_profiles is '[BUSINESS] Private per-artist strengths, cautions, and brand safety assessment.';
 comment on table public.artist_collaborations is '[BUSINESS] Private per-artist collaboration history with brand, date, link, summary, and performance.';
+comment on column public.artist_collaborations.brand_industry is 'Admin-entered brand industry text. Replaces brand_category_id for collaboration history entry.';
+comment on column public.artist_collaborations.collaboration_date is 'Admin-entered collaboration date label, normally YY.MM.DD.';
+comment on column public.artist_collaborations.brand_category_id is 'Deprecated compatibility column. New collaboration history uses brand_industry.';
+comment on column public.artist_collaborations.ad_disclosure_status is 'Deprecated compatibility column. Advertising disclosure is treated as mandatory and is no longer entered in Admin.';
+comment on column public.artist_collaborations.views is 'Deprecated compatibility column. View counts are no longer collected in Admin.';
 comment on table public.magazines is '[EDITORIAL] Magazine article content, publication state, media, and view count.';
 comment on table public.magazine_artists is '[EDITORIAL] Ordered many-to-many relation for artists embedded in magazine articles.';
 comment on table public.toon_tests is '[TOONBTI] Test identity, publication state, version, and canonical editor draft.';

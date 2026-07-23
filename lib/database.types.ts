@@ -83,7 +83,9 @@ export type Database = {
         id: string;
         artist_id: string;
         brand_name: string;
+        brand_industry: string;
         brand_category_id: string | null;
+        collaboration_date: string;
         collaboration_year: number;
         collaboration_month: number | null;
         post_url: string;

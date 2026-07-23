@@ -18,7 +18,8 @@ const migrationFiles = {
   legacyGrowthBaseline: "202607110008_backfill_legacy_growth_baseline.sql",
   schemaHousekeeping: "202607110009_schema_housekeeping.sql",
   domainClassification: "202607110010_domain_classification.sql",
-  publicBioBackfill: "202607130011_backfill_public_bio_from_internal_memo.sql"
+  publicBioBackfill: "202607130011_backfill_public_bio_from_internal_memo.sql",
+  collaborationSimplification: "202607230012_simplify_artist_collaborations.sql"
 } as const;
 
 function readMigration(fileName: string) {
@@ -45,7 +46,8 @@ describe("Supabase refactor migrations", () => {
       migrationFiles.legacyGrowthBaseline,
       migrationFiles.schemaHousekeeping,
       migrationFiles.domainClassification,
-      migrationFiles.publicBioBackfill
+      migrationFiles.publicBioBackfill,
+      migrationFiles.collaborationSimplification
     ]);
   });
 
@@ -219,6 +221,19 @@ describe("Supabase refactor migrations", () => {
     expect(sql).not.toMatch(/\b(drop\s+column|drop\s+table|truncate)\b/);
   });
 
+  it("adds simplified collaboration fields and backfills legacy values without deleting data", () => {
+    const sql = normalizeSql(readMigration(migrationFiles.collaborationSimplification));
+
+    expect(sql).toContain("add column if not exists brand_industry text not null default ''");
+    expect(sql).toContain("add column if not exists collaboration_date text not null default ''");
+    expect(sql).toContain("set brand_industry = coalesce(category.name, '')");
+    expect(sql).toContain("right(collaboration_year::text, 2)");
+    expect(sql).toContain("lpad(collaboration_month::text, 2, '0')");
+    expect(sql).toContain("advertising disclosure is treated as mandatory");
+    expect(sql).toContain("view counts are no longer collected");
+    expect(sql).not.toMatch(/\b(drop\s+column|drop\s+table|truncate)\b/);
+  });
+
   it("guards, backs up, and then removes verified legacy structures", () => {
     const sql = normalizeSql(readMigration(migrationFiles.cleanup));
 
@@ -255,6 +270,8 @@ describe("Supabase refactor migrations", () => {
     expect(sql).toContain("strengths text not null default ''");
     expect(sql).toContain("cautions text not null default ''");
     expect(sql).toContain("create table if not exists public.artist_collaborations");
+    expect(sql).toContain("brand_industry text not null default ''");
+    expect(sql).toContain("collaboration_date text not null default ''");
     expect(sql).toContain("collaboration_year smallint not null");
     expect(sql).toContain("content_summary text not null default ''");
     expect(sql).toContain("views bigint check (views is null or views >= 0)");
