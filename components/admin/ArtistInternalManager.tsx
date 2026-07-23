@@ -34,29 +34,23 @@ const EMPTY_DETAILS: AdminArtistDetails = {
 type CollaborationForm = {
   id: string;
   brand_name: string;
-  brand_category_id: string;
-  collaboration_year: string;
-  collaboration_month: string;
+  brand_industry: string;
+  collaboration_date: string;
   post_url: string;
   content_summary: string;
-  ad_disclosure_status: "yes" | "no" | "unknown";
   likes: string;
   comments: string;
-  views: string;
 };
 
 const EMPTY_COLLABORATION: CollaborationForm = {
   id: "",
   brand_name: "",
-  brand_category_id: "",
-  collaboration_year: String(new Date().getFullYear()),
-  collaboration_month: "",
+  brand_industry: "",
+  collaboration_date: "",
   post_url: "",
   content_summary: "",
-  ad_disclosure_status: "unknown",
   likes: "",
-  comments: "",
-  views: ""
+  comments: ""
 };
 
 function todayInSeoul() {
@@ -274,15 +268,12 @@ export function ArtistInternalManager({ artistId }: { artistId?: string }) {
     setCollaborationForm({
       id: item.id,
       brand_name: item.brand_name,
-      brand_category_id: item.brand_category_id ?? "",
-      collaboration_year: String(item.collaboration_year),
-      collaboration_month: item.collaboration_month === null ? "" : String(item.collaboration_month),
+      brand_industry: item.brand_industry || item.brand_category_name || "",
+      collaboration_date: item.collaboration_date || `${String(item.collaboration_year).slice(-2)}${item.collaboration_month ? `.${String(item.collaboration_month).padStart(2, "0")}` : ""}`,
       post_url: item.post_url,
       content_summary: item.content_summary,
-      ad_disclosure_status: item.ad_disclosure_status,
       likes: item.likes === null ? "" : String(item.likes),
-      comments: item.comments === null ? "" : String(item.comments),
-      views: item.views === null ? "" : String(item.views)
+      comments: item.comments === null ? "" : String(item.comments)
     });
   };
 
@@ -430,14 +421,12 @@ export function ArtistInternalManager({ artistId }: { artistId?: string }) {
           <>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               <label className="space-y-1 lg:col-span-2"><span className="text-xs font-semibold text-slate-500">브랜드명</span><input value={collaborationForm.brand_name} onChange={(event) => setCollaborationForm((current) => ({ ...current, brand_name: event.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>
-              <label className="space-y-1"><span className="text-xs font-semibold text-slate-500">브랜드 업종</span><select value={collaborationForm.brand_category_id} onChange={(event) => setCollaborationForm((current) => ({ ...current, brand_category_id: event.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5"><option value="">미지정</option>{details.brand_categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-              <label className="space-y-1"><span className="text-xs font-semibold text-slate-500">광고 표시</span><select value={collaborationForm.ad_disclosure_status} onChange={(event) => setCollaborationForm((current) => ({ ...current, ad_disclosure_status: event.target.value as "yes" | "no" | "unknown" }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5"><option value="unknown">미확인</option><option value="yes">표시</option><option value="no">미표시</option></select></label>
-              <label className="space-y-1"><span className="text-xs font-semibold text-slate-500">연도</span><input type="number" min="2000" value={collaborationForm.collaboration_year} onChange={(event) => setCollaborationForm((current) => ({ ...current, collaboration_year: event.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>
-              <label className="space-y-1"><span className="text-xs font-semibold text-slate-500">월</span><input type="number" min="1" max="12" value={collaborationForm.collaboration_month} onChange={(event) => setCollaborationForm((current) => ({ ...current, collaboration_month: event.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>
+              <label className="space-y-1"><span className="text-xs font-semibold text-slate-500">브랜드 업종</span><input value={collaborationForm.brand_industry} onChange={(event) => setCollaborationForm((current) => ({ ...current, brand_industry: event.target.value }))} placeholder="예: 식품, 뷰티, 패션" className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>
+              <label className="space-y-1"><span className="text-xs font-semibold text-slate-500">협업 날짜</span><input value={collaborationForm.collaboration_date} onChange={(event) => setCollaborationForm((current) => ({ ...current, collaboration_date: event.target.value }))} placeholder="예: 26.07.01" className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>
               <label className="space-y-1 lg:col-span-2"><span className="text-xs font-semibold text-slate-500">Instagram 게시물 URL</span><input value={collaborationForm.post_url} onChange={(event) => setCollaborationForm((current) => ({ ...current, post_url: event.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>
               <label className="space-y-1 lg:col-span-4"><span className="text-xs font-semibold text-slate-500">협업 내용</span><textarea rows={3} maxLength={2000} value={collaborationForm.content_summary} onChange={(event) => setCollaborationForm((current) => ({ ...current, content_summary: event.target.value }))} placeholder="예: 신제품 출시 캠페인 릴스, 제품 사용 장면과 할인 코드 소개" className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5" /><span className="block text-right text-[11px] text-slate-400">{collaborationForm.content_summary.length}/2,000</span></label>
-              {(["likes", "comments", "views"] as const).map((key) => <label key={key} className="space-y-1"><span className="text-xs font-semibold text-slate-500">{{ likes: "좋아요", comments: "댓글", views: "조회수" }[key]}</span><input type="number" min="0" value={collaborationForm[key]} onChange={(event) => setCollaborationForm((current) => ({ ...current, [key]: event.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>)}
-              <div className="flex items-end gap-2"><button type="button" disabled={busy} onClick={() => void run(async () => { await readJson(await fetch(`/api/admin/artists/${artistId}/collaborations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...collaborationForm, collaboration_year: Number(collaborationForm.collaboration_year), collaboration_month: optionalInteger(collaborationForm.collaboration_month), likes: optionalInteger(collaborationForm.likes), comments: optionalInteger(collaborationForm.comments), views: optionalInteger(collaborationForm.views) }) })); setCollaborationForm(EMPTY_COLLABORATION); }, collaborationForm.id ? "협업 이력을 수정했습니다." : "협업 이력을 추가했습니다.")} className="rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{collaborationForm.id ? "수정 저장" : "협업 추가"}</button>{collaborationForm.id ? <button type="button" onClick={() => setCollaborationForm(EMPTY_COLLABORATION)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">취소</button> : null}</div>
+              {(["likes", "comments"] as const).map((key) => <label key={key} className="space-y-1"><span className="text-xs font-semibold text-slate-500">{{ likes: "좋아요", comments: "댓글" }[key]}</span><input type="number" min="0" value={collaborationForm[key]} onChange={(event) => setCollaborationForm((current) => ({ ...current, [key]: event.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2.5" /></label>)}
+              <div className="flex items-end gap-2"><button type="button" disabled={busy} onClick={() => void run(async () => { await readJson(await fetch(`/api/admin/artists/${artistId}/collaborations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...collaborationForm, likes: optionalInteger(collaborationForm.likes), comments: optionalInteger(collaborationForm.comments) }) })); setCollaborationForm(EMPTY_COLLABORATION); }, collaborationForm.id ? "협업 이력을 수정했습니다." : "협업 이력을 추가했습니다.")} className="rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">{collaborationForm.id ? "수정 저장" : "협업 추가"}</button>{collaborationForm.id ? <button type="button" onClick={() => setCollaborationForm(EMPTY_COLLABORATION)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">취소</button> : null}</div>
             </div>
             <div className="space-y-2">{details.collaborations.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 md:flex-row md:items-start md:justify-between"><div className="min-w-0"><p className="font-semibold text-slate-800">{item.brand_name}</p><p className="mt-1 text-xs text-slate-500">{item.collaboration_year}{item.collaboration_month ? `.${item.collaboration_month}` : ""} · {item.brand_category_name ?? "업종 미지정"}</p>{item.content_summary ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{item.content_summary}</p> : null}<a href={item.post_url} target="_blank" rel="noreferrer" className="mt-2 block truncate text-xs font-medium text-blue-600 hover:underline">{item.post_url}</a></div><div className="flex shrink-0 gap-2"><button type="button" onClick={() => editCollaboration(item)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold">수정</button><button type="button" onClick={() => { if (window.confirm("이 협업 이력을 삭제할까요?")) void run(async () => { await readJson(await fetch(`/api/admin/artists/${artistId}/collaborations`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ collaboration_id: item.id }) })); }, "협업 이력을 삭제했습니다."); }} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-500">삭제</button></div></div>)}</div>
           </>

@@ -46,7 +46,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
         supabase
           .from("artist_collaborations")
           .select(
-            "id, artist_id, brand_name, brand_category_id, collaboration_year, collaboration_month, post_url, content_summary, ad_disclosure_status, likes, comments, views, created_at, updated_at, brand_category:brand_categories(name)"
+            "id, artist_id, brand_name, brand_industry, brand_category_id, collaboration_date, collaboration_year, collaboration_month, post_url, content_summary, ad_disclosure_status, likes, comments, views, created_at, updated_at, brand_category:brand_categories(name)"
           )
           .eq("artist_id", params.id)
           .order("collaboration_year", { ascending: false })
