@@ -494,35 +494,38 @@ export function ToonbtiManager({ artists }: { artists: Artist[] }) {
             >
               <Save size={16} /> 저장
             </button>
-            {config.test.status === "published" ? (
-              <div className="flex h-12 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-700">테스트 공개</p>
-                  <p className="text-[11px] text-slate-500">
-                    {config.test.isActive ? "ON · 실제 테스트 표시" : "OFF · 개선 중 안내 표시"}
-                  </p>
-                </div>
-                <Toggle
-                  active={config.test.isActive}
-                  label="툰비티아이 공개 상태"
-                  disabled={busy}
-                  onClick={() =>
-                    void saveConfig(
-                      {
-                        ...config,
-                        test: {
-                          ...config.test,
-                          isActive: !config.test.isActive
-                        }
-                      },
-                      config.test.isActive
-                        ? "툰비티아이를 개선 중 상태로 전환했습니다."
-                        : "툰비티아이를 공개했습니다."
-                    )
-                  }
-                />
+            <div className="flex h-12 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3">
+              <div>
+                <p className="text-xs font-bold text-slate-700">테스트 공개</p>
+                <p className="text-[11px] text-slate-500">
+                  {config.test.status !== "published"
+                    ? "게시 전 · 검증 후 게시 필요"
+                    : config.test.isActive
+                      ? "ON · 실제 테스트 표시"
+                      : "OFF · 개선 중 안내 표시"}
+                </p>
               </div>
-            ) : (
+              <Toggle
+                active={config.test.status === "published" && config.test.isActive}
+                label="툰비티아이 공개 상태"
+                disabled={busy || config.test.status !== "published"}
+                onClick={() =>
+                  void saveConfig(
+                    {
+                      ...config,
+                      test: {
+                        ...config.test,
+                        isActive: !config.test.isActive
+                      }
+                    },
+                    config.test.isActive
+                      ? "툰비티아이를 개선 중 상태로 전환했습니다."
+                      : "툰비티아이를 공개했습니다."
+                  )
+                }
+              />
+            </div>
+            {config.test.status !== "published" ? (
               <button
                 type="button"
                 disabled={busy}
@@ -536,7 +539,7 @@ export function ToonbtiManager({ artists }: { artists: Artist[] }) {
               >
                 검증 후 게시
               </button>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="flex gap-1 overflow-x-auto px-4 pt-3">

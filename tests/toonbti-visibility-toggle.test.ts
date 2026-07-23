@@ -14,6 +14,8 @@ describe("Toon-BTI visibility toggle", () => {
 
     expect(manager).toContain("테스트 공개");
     expect(manager).toContain("OFF · 개선 중 안내 표시");
+    expect(manager).toContain("게시 전 · 검증 후 게시 필요");
+    expect(manager).toContain('disabled={busy || config.test.status !== "published"}');
     expect(manager).toContain("isActive: !config.test.isActive");
     expect(manager).not.toContain(
       '{ ...config, test: { ...config.test, status: "draft", isActive: false } }'
