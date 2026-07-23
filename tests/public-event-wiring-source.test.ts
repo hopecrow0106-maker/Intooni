@@ -10,6 +10,7 @@ const sources = {
   home: readFileSync(path.join(root, "components/home/HomeClient.tsx"), "utf8"),
   magazine: readFileSync(path.join(root, "app/magazine/[id]/page.tsx"), "utf8"),
   toonbti: readFileSync(path.join(root, "components/toonbti/ToonTestRunner.tsx"), "utf8"),
+  toonbtiArtist: readFileSync(path.join(root, "components/toonbti/ToonbtiArtistCard.tsx"), "utf8"),
   adminTable: readFileSync(path.join(root, "components/admin/ArtistTable.tsx"), "utf8"),
   adminForm: readFileSync(path.join(root, "components/admin/ArtistForm.tsx"), "utf8")
 };
@@ -19,7 +20,8 @@ describe("public artist event wiring", () => {
     expect(sources.card).toContain('eventType="artist_click"');
     expect(sources.home).toContain('eventType: "artist_click"');
     expect(sources.magazine).toContain('eventType="artist_click"');
-    expect(sources.toonbti).toContain('eventType="artist_click"');
+    expect(sources.toonbtiArtist).toContain('eventType: "toonbti_artist_click"');
+    expect(sources.toonbtiArtist).toContain('eventType: "toonbti_instagram_outbound"');
   });
 
   it("uses instagram_outbound for public Instagram profile and post actions", () => {

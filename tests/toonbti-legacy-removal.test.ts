@@ -6,28 +6,50 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const adminSource = readFileSync(path.join(root, "app/admin/page.tsx"), "utf8");
 const publicSource = readFileSync(path.join(root, "app/toonbti/page.tsx"), "utf8");
-const routeMapSource = readFileSync(
-  path.join(root, "components/admin/ToonbtiRouteMapBuilder.tsx"),
+const managerSource = readFileSync(path.join(root, "components/admin/ToonbtiManager.tsx"), "utf8");
+const runnerSource = readFileSync(path.join(root, "components/toonbti/ToonTestRunner.tsx"), "utf8");
+const artistFormSource = readFileSync(path.join(root, "components/admin/ArtistForm.tsx"), "utf8");
+const artistAssignmentSource = readFileSync(
+  path.join(root, "components/admin/ArtistToonbtiAssignment.tsx"),
   "utf8"
 );
 
-describe("ToonBTI legacy cleanup", () => {
-  it("removes the legacy DB manager, tag manager, and legacy API route", () => {
-    expect(existsSync(path.join(root, "components/admin/ToonbtiManager.tsx"))).toBe(false);
+describe("ToonBTI scoring model transition", () => {
+  it("keeps removed legacy tag APIs out while installing the normalized manager", () => {
+    expect(existsSync(path.join(root, "components/admin/ToonbtiManager.tsx"))).toBe(true);
     expect(existsSync(path.join(root, "components/admin/ToonbtiTagManager.tsx"))).toBe(false);
     expect(existsSync(path.join(root, "app/api/toonbti/route.ts"))).toBe(false);
     expect(adminSource).not.toContain("ToonbtiTagManager");
+    expect(adminSource).toContain("ToonbtiManager");
+    expect(adminSource).not.toContain("ToonbtiRouteMapBuilder");
     expect(adminSource).not.toContain("episode_formats");
     expect(publicSource).not.toContain("episode_formats");
   });
 
-  it("keeps the new question/result route-map editor and test runner", () => {
-    expect(adminSource).toContain("ToonbtiRouteMapBuilder");
-    expect(routeMapSource).toContain("ToonRouteDraft as RouteDraft");
-    expect(routeMapSource).toContain("resultArtists");
-    expect(routeMapSource).toContain("전체화면 편집");
-    expect(routeMapSource).toContain("관리자 테스트");
-    expect(routeMapSource).toContain('/api/admin/toon-tests');
-    expect(routeMapSource).not.toContain("localStorage");
+  it("uses the four-axis manager and score-based public runner", () => {
+    expect(managerSource).toContain('type ManagerTab = "axes" | "questions" | "results" | "artists"');
+    expect(managerSource).not.toContain('{ id: "settings", label: "기본 설정" }');
+    expect(managerSource).toContain('{ id: "questions", label: "2. 질문·답변" }');
+    expect(managerSource).toContain("getPossibleToonbtiCodes");
+    expect(managerSource).toContain("CANONICAL_TOONBTI_AXES");
+    expect(managerSource).toContain("고정 4축 불러오기");
+    expect(managerSource).toContain("/api/admin/toonbti/assignments");
+    expect(runnerSource).toContain("calculateToonbtiResult");
+    expect(runnerSource).toContain("window.localStorage");
+    expect(publicSource).toContain("getPublishedToonbtiConfig");
+  });
+
+  it("does not expose the retired Tone, style, and topic tag editor as Toon-BTI", () => {
+    expect(artistFormSource).not.toContain('label="툰비티아이 Tone"');
+    expect(artistFormSource).not.toContain('label="툰비티아이 그림체"');
+    expect(artistFormSource).not.toContain('label="툰비티아이 주제"');
+  });
+
+  it("assigns the four-axis Toon-BTI from each artist basic information screen", () => {
+    expect(artistFormSource).toContain("ArtistToonbtiAssignment");
+    expect(artistAssignmentSource).toContain("getActiveToonbtiAxes");
+    expect(artistAssignmentSource).toContain("getActiveTraitsForAxis");
+    expect(artistAssignmentSource).toContain("/api/admin/toonbti/assignments");
+    expect(artistAssignmentSource).toContain("검색 태그와는 별개입니다.");
   });
 });

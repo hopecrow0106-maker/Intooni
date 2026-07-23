@@ -143,8 +143,98 @@ export type Database = {
         version: number;
         start_node_key: string;
         draft: Json;
+        description: string;
+        intro_image_url: string | null;
+        start_button_label: string;
+        share_text: string;
+        is_active: boolean;
         created_at: string;
         updated_at: string;
+      }>;
+      toonbti_axes: Row<{
+        id: string;
+        test_id: string;
+        name: string;
+        position: number;
+        tie_break_trait_id: string | null;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      toonbti_traits: Row<{
+        id: string;
+        test_id: string;
+        axis_id: string;
+        code: string;
+        name: string;
+        description: string;
+        position: number;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      toonbti_questions: Row<{
+        id: string;
+        test_id: string;
+        axis_id: string;
+        question_text: string;
+        position: number;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      toonbti_question_options: Row<{
+        id: string;
+        question_id: string;
+        axis_id: string;
+        trait_id: string;
+        option_text: string;
+        score: 5 | 10;
+        position: number;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      toonbti_result_types: Row<{
+        id: string;
+        test_id: string;
+        code: string;
+        name: string;
+        short_description: string;
+        long_description: string;
+        image_url: string | null;
+        share_image_url: string | null;
+        keywords: string[];
+        share_text: string;
+        position: number;
+        is_active: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      artist_toonbti_types: Row<{
+        artist_id: string;
+        test_id: string;
+        result_type_id: string;
+        created_at: string;
+        updated_at: string;
+      }>;
+      toonbti_events: Row<{
+        id: string;
+        test_id: string | null;
+        event_type:
+          | "toonbti_start"
+          | "toonbti_answer"
+          | "toonbti_complete"
+          | "toonbti_result_share"
+          | "toonbti_image_save"
+          | "toonbti_artist_click"
+          | "toonbti_instagram_outbound"
+          | "toonbti_restart";
+        result_code: string | null;
+        question_id: string | null;
+        artist_id: string | null;
+        metadata: Json;
+        created_at: string;
       }>;
       toon_nodes: Row<{
         test_id: string;

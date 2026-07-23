@@ -19,6 +19,7 @@ import type { Artist } from "@/lib/types";
 
 type ArtistTableProps = {
   artists: Artist[];
+  duplicateInstagramHandleIds?: Set<string>;
   statsByArtistId: Record<string, ArtistStatsSummary>;
   statsPeriod: ArtistStatsPeriod;
   onEdit: (artist: Artist) => void;
@@ -113,6 +114,7 @@ function MiniSwitch({ active, label, onClick }: { active: boolean; label: string
 
 export function ArtistTable({
   artists,
+  duplicateInstagramHandleIds = new Set(),
   statsByArtistId,
   statsPeriod,
   onEdit,
@@ -196,6 +198,11 @@ export function ArtistTable({
                           <div className="min-w-0">
                             <p className="truncate text-sm font-bold text-ink">{artist.name}</p>
                             <div className="mt-1 flex flex-wrap gap-1 xl:hidden">
+                              {duplicateInstagramHandleIds.has(artist.id) ? (
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                  중복 계정 경고
+                                </span>
+                              ) : null}
                               <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${getStatusStyle(artist.status)}`}>
                                 {getStatusLabel(artist.status)}
                               </span>
@@ -207,7 +214,14 @@ export function ArtistTable({
                         </div>
 
                         <div className="min-w-0 text-xs">
-                          <p className="truncate font-medium text-slate-600">@{artist.instagram_handle}</p>
+                          <p className="truncate font-medium text-slate-600">
+                            @{artist.instagram_handle}
+                            {duplicateInstagramHandleIds.has(artist.id) ? (
+                              <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                중복 계정 경고
+                              </span>
+                            ) : null}
+                          </p>
                           <p className="mt-1 truncate text-slate-400">{artist.genre || "카테고리 없음"}</p>
                         </div>
 

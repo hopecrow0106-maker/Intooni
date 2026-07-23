@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ToonTestRunner } from "@/components/toonbti/ToonTestRunner";
-import { getPublishedToonTest } from "@/lib/server/toon-tests";
+import { getPublishedToonbtiConfig } from "@/lib/server/toonbti";
 import { CANONICAL_SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "툰비티아이 | 인투니",
-  description: "인투니의 질문·결과 루트맵 기반 작가 추천 테스트입니다.",
+  description: "4가지 성향축으로 나와 잘 맞는 인스타툰 작가를 찾는 테스트입니다.",
   alternates: { canonical: `${CANONICAL_SITE_URL}/toonbti` },
   openGraph: { url: `${CANONICAL_SITE_URL}/toonbti` }
 };
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ToonbtiPage() {
-  const test = await getPublishedToonTest().catch(() => null);
+  const config = await getPublishedToonbtiConfig().catch(() => null);
 
   return (
     <main className="min-h-screen bg-[#f8f7f4] text-[#1a1a1a]">
@@ -31,8 +31,8 @@ export default async function ToonbtiPage() {
         </Link>
       </nav>
 
-      {test ? (
-        <ToonTestRunner test={test} />
+      {config ? (
+        <ToonTestRunner config={config} />
       ) : (
         <section className="mx-auto flex min-h-[calc(100vh-60px)] w-full max-w-3xl items-center justify-center px-5 py-16 text-center md:px-8">
           <div className="w-full border-y border-[#ffd6df] bg-white px-6 py-14 md:px-10">

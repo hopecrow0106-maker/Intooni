@@ -9,7 +9,8 @@ const read = (file: string) => readFileSync(path.join(root, file), "utf8");
 const categoryRoute = read("app/api/categories/route.ts");
 const magazineRoute = read("app/api/magazines/route.ts");
 const toonRoute = read("app/api/admin/toon-tests/route.ts");
-const toonBuilder = read("components/admin/ToonbtiRouteMapBuilder.tsx");
+const toonScoringRoute = read("app/api/admin/toonbti/route.ts");
+const toonManager = read("components/admin/ToonbtiManager.tsx");
 const detailsRoute = read("app/api/admin/artists/[id]/details/route.ts");
 const internalManager = read("components/admin/ArtistInternalManager.tsx");
 const adminPage = read("app/admin/page.tsx");
@@ -26,8 +27,10 @@ describe("Admin pre-migration compatibility and workspace layout", () => {
 
   it("opens unavailable ToonBTI and internal schemas in a safe preparation state", () => {
     expect(toonRoute).toContain("storageAvailable: false");
-    expect(toonBuilder).toContain('saveState === "unavailable"');
-    expect(toonBuilder).not.toContain("localStorage");
+    expect(toonScoringRoute).toContain("storageAvailable: false");
+    expect(toonScoringRoute).toContain("마이그레이션 013");
+    expect(toonManager).toContain("storageAvailable");
+    expect(toonManager).not.toContain("localStorage");
     expect(detailsRoute).toContain("isMissingInternalSchema");
     expect(detailsRoute).toContain("storageAvailable: false");
     expect(internalManager).toContain("내부 데이터 저장소 준비 필요");

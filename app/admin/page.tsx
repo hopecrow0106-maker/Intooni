@@ -8,12 +8,13 @@ import { ArtistTable } from "@/components/admin/ArtistTable";
 import { GrowthAnalyticsDashboard } from "@/components/admin/GrowthAnalyticsDashboard";
 import { MagazineForm, type MagazineFormValues } from "@/components/admin/MagazineForm";
 import { MagazineTable } from "@/components/admin/MagazineTable";
-import { ToonbtiRouteMapBuilder } from "@/components/admin/ToonbtiRouteMapBuilder";
+import { ToonbtiManager } from "@/components/admin/ToonbtiManager";
 import {
   type ArtistStatsPeriod,
   type ArtistStatsSummary
 } from "@/lib/artist-events";
 import type { Artist, Category, Magazine } from "@/lib/types";
+import { normalizeInstagramHandle } from "@/lib/normalize";
 import type { AdminGrowthAnalytics } from "@/lib/domain/admin-growth-analytics";
 
 type DebugError = {
@@ -85,6 +86,7 @@ type ArtistEventMetricKey = Exclude<
 const ADMIN_ARTISTS_PER_PAGE = 20;
 const ARTIST_STATS_STALE_DAYS = 14;
 const REQUIRED_GALLERY_POST_COUNT = 4;
+
 const GENERAL_SHEET_TARGETS: Array<{ value: GeneralAdminSheetImportTarget; label: string }> = [
   { value: "artists", label: "작가 기본정보 (artists)" },
   { value: "categories", label: "작가 카테고리 (categories)" },
@@ -112,7 +114,7 @@ const ADMIN_NAV_ITEMS: Array<{
   {
     key: "toonbti",
     label: "툰비티아이 관리",
-    description: "질문·결과 루트맵"
+    description: "4축·질문·결과·작가 유형"
   },
   {
     key: "statistics",
@@ -305,7 +307,7 @@ function getAdminTabMeta(tab: AdminTab) {
     case "toonbti":
       return {
         title: "툰비티아이 관리",
-        description: "추천 경로, 태그, 결과 데이터를 관리해 매칭 품질을 유지합니다."
+        description: "4개 성향축과 질문, 결과 유형, 작가별 유형을 관리합니다."
       };
     case "statistics":
       return {
@@ -1694,9 +1696,23 @@ export default function AdminPage() {
     }
   };
 
+  const duplicateInstagramHandleIds = useMemo(() => {
+    const artistIdsByHandle = new Map<string, string[]>();
+    artists.forEach((artist) => {
+      const handle = normalizeInstagramHandle(artist.instagram_handle);
+      if (!handle) return;
+      artistIdsByHandle.set(handle, [...(artistIdsByHandle.get(handle) ?? []), artist.id]);
+    });
+
+    return new Set([...artistIdsByHandle.values()].filter((ids) => ids.length > 1).flat());
+  }, [artists]);
+
   const sortedArtists = useMemo(
     () =>
       [...artists].sort((a, b) => {
+        const duplicateDiff =
+          Number(duplicateInstagramHandleIds.has(b.id)) - Number(duplicateInstagramHandleIds.has(a.id));
+        if (duplicateDiff !== 0) return duplicateDiff;
         const createdAtDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 
         if (Number.isNaN(createdAtDiff) || createdAtDiff === 0) {
@@ -1705,7 +1721,7 @@ export default function AdminPage() {
 
         return createdAtDiff;
       }),
-    [artists]
+    [artists, duplicateInstagramHandleIds]
   );
 
   const filteredSortedArtists = useMemo(() => {
@@ -2669,7 +2685,7 @@ export default function AdminPage() {
         </>
       ) : (
         <section className="mt-6 space-y-6">
-          <ToonbtiRouteMapBuilder artists={sortedArtists} />
+          <ToonbtiManager artists={sortedArtists} />
         </section>
       )}
 
@@ -2719,6 +2735,7 @@ export default function AdminPage() {
             </div>
             <ArtistTable
               artists={paginatedArtists}
+              duplicateInstagramHandleIds={duplicateInstagramHandleIds}
               statsByArtistId={artistStats}
               statsPeriod={statsPeriod}
               onEdit={(artist) => {
@@ -2775,6 +2792,7 @@ export default function AdminPage() {
       <ArtistForm
         isOpen={artistFormOpen}
         initialArtist={selectedArtist}
+        artists={artists}
         categories={categories}
         stats={selectedArtist ? artistStats[selectedArtist.id] ?? null : null}
         statsPeriod={statsPeriod}

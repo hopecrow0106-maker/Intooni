@@ -5,6 +5,7 @@ import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "r
 
 import { InstagramQuickImport } from "@/components/admin/InstagramQuickImport";
 import { ArtistInternalManager } from "@/components/admin/ArtistInternalManager";
+import { ArtistToonbtiAssignment } from "@/components/admin/ArtistToonbtiAssignment";
 import { InstagramEmbed } from "@/components/InstagramEmbed";
 import {
   EMPTY_ARTIST_STATS,
@@ -12,6 +13,7 @@ import {
   type ArtistStatsSummary
 } from "@/lib/artist-events";
 import type { Artist, Category } from "@/lib/types";
+import { normalizeInstagramHandle } from "@/lib/normalize";
 
 export type ArtistFormValues = {
   id?: string;
@@ -39,6 +41,7 @@ export type ArtistFormValues = {
 type ArtistFormProps = {
   isOpen: boolean;
   initialArtist: Artist | null;
+  artists: Artist[];
   categories: Category[];
   stats?: ArtistStatsSummary | null;
   statsPeriod: ArtistStatsPeriod;
@@ -57,12 +60,14 @@ type ArtistEditorTab = "profile" | "media" | "internal";
 
 type TagFieldKey =
   | "hashtags"
-  | "search_tags"
-  | "mood_tags"
-  | "style_tags"
-  | "topic_tags";
+  | "search_tags";
 
 const EMPTY_GALLERY_POST_URLS = ["", "", "", ""];
+const DUPLICATE_STATUS_GROUPS = [
+  { status: "active", label: "활성 작가", className: "bg-emerald-50 text-emerald-700" },
+  { status: "hidden", label: "숨김 작가", className: "bg-amber-50 text-amber-700" },
+  { status: "archived", label: "보관 작가", className: "bg-slate-100 text-slate-600" }
+] as const;
 const ARTIST_FORM_STATS_METRICS: Array<{
   key: keyof Omit<ArtistStatsSummary, "artist_id">;
   label: string;
@@ -309,6 +314,7 @@ function ArtistStatsBreakdown({
 export function ArtistForm({
   isOpen,
   initialArtist,
+  artists,
   categories,
   stats,
   statsPeriod,
@@ -323,9 +329,6 @@ export function ArtistForm({
   );
   const [tagInput, setTagInput] = useState("");
   const [hiddenTagInput, setHiddenTagInput] = useState("");
-  const [moodInput, setMoodInput] = useState("");
-  const [styleInput, setStyleInput] = useState("");
-  const [topicInput, setTopicInput] = useState("");
   const [uploading, setUploading] = useState<UploadingState>({
     thumbnail: false,
     character: false
@@ -342,9 +345,6 @@ export function ArtistForm({
     setInitialSnapshot(JSON.stringify(nextForm));
     setTagInput("");
     setHiddenTagInput("");
-    setMoodInput("");
-    setStyleInput("");
-    setTopicInput("");
     setFormMessage("");
     setEditorTab("profile");
     setUploading({ thumbnail: false, character: false });
@@ -364,6 +364,14 @@ export function ArtistForm({
   const isBusy = saving || uploading.thumbnail || uploading.character || categoryBusy;
   const primaryPreviewUrl = form.gallery_post_urls[0]?.trim() ?? "";
   const hasUnsavedChanges = JSON.stringify(form) !== initialSnapshot;
+  const duplicateArtists = form.instagram_handle.trim()
+    ? artists.filter(
+        (artist) =>
+          artist.id !== initialArtist?.id &&
+          normalizeInstagramHandle(artist.instagram_handle) === normalizeInstagramHandle(form.instagram_handle)
+      )
+    : [];
+  const hasDuplicateInstagramHandle = duplicateArtists.length > 0;
 
   const requestClose = () => {
     if (isBusy) {
@@ -595,7 +603,7 @@ export function ArtistForm({
                 <button
                   type="submit"
                   form={formId}
-                  disabled={isBusy || !form.main_category_id}
+                  disabled={isBusy || !form.main_category_id || hasDuplicateInstagramHandle}
                   className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"
                 >
                   {isBusy ? "저장 중..." : "저장"}
@@ -637,6 +645,11 @@ export function ArtistForm({
             onSubmit={async (event) => {
               event.preventDefault();
               setFormMessage("");
+
+              if (hasDuplicateInstagramHandle) {
+                setFormMessage("같은 인스타그램 아이디가 이미 등록되어 있어 저장할 수 없습니다.");
+                return;
+              }
 
               await onSave({
                 ...form,
@@ -711,8 +724,30 @@ export function ArtistForm({
                       instagram_handle: event.target.value.replace(/^@/, "")
                     }))
                   }
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-ink"
+                  aria-describedby={hasDuplicateInstagramHandle ? "instagram-handle-duplicate-warning" : undefined}
+                  className={`h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none transition focus:border-ink ${
+                    hasDuplicateInstagramHandle ? "border-amber-400 bg-amber-50" : "border-slate-200"
+                  }`}
                 />
+                {hasDuplicateInstagramHandle ? (
+                  <div id="instagram-handle-duplicate-warning" className="space-y-1.5 text-xs text-amber-800">
+                    <p className="font-semibold">이미 등록된 계정입니다. 상태를 확인해 주세요.</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DUPLICATE_STATUS_GROUPS.map((group) => {
+                        const matchingArtists = duplicateArtists.filter(
+                          (artist) => (artist.status ?? "active") === group.status
+                        );
+                        if (matchingArtists.length === 0) return null;
+
+                        return (
+                          <span key={group.status} className={`rounded px-2 py-1 font-semibold ${group.className}`}>
+                            {group.label}: {matchingArtists.map((artist) => artist.name).join(", ")}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </label>
 
               <label className="space-y-1.5 md:col-span-2 xl:col-span-1">
@@ -823,6 +858,8 @@ export function ArtistForm({
               </p>
             </div>
           </section>
+
+          <ArtistToonbtiAssignment artistId={initialArtist?.id} />
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -947,65 +984,6 @@ export function ArtistForm({
             chipClassName="rounded-full border border-dashed border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-500"
           />
 
-          <TagSection
-            label="툰비티아이 Tone"
-            helper="이걸 보는 시청자는 어떤 감정을 느낄 것인가?"
-            inputValue={moodInput}
-            onInputChange={setMoodInput}
-            onAdd={() => addArrayValue("mood_tags", moodInput, () => setMoodInput(""))}
-            onKeyDown={(event) => {
-              if (isKoreanComposing(event)) {
-                return;
-              }
-              if (event.key === "Enter") {
-                event.preventDefault();
-                addArrayValue("mood_tags", moodInput, () => setMoodInput(""));
-              }
-            }}
-            tags={form.mood_tags}
-            onRemove={(value) => removeArrayValue("mood_tags", value)}
-            chipClassName="rounded-full bg-[#fff0f3] px-3 py-1.5 text-sm text-[#c9153d]"
-          />
-
-          <TagSection
-            label="툰비티아이 그림체"
-            helper="예: 단순, 귀여움, 감성적, 현실적, 개성적, 흑백, 컬러풀, 밈"
-            inputValue={styleInput}
-            onInputChange={setStyleInput}
-            onAdd={() => addArrayValue("style_tags", styleInput, () => setStyleInput(""))}
-            onKeyDown={(event) => {
-              if (isKoreanComposing(event)) {
-                return;
-              }
-              if (event.key === "Enter") {
-                event.preventDefault();
-                addArrayValue("style_tags", styleInput, () => setStyleInput(""));
-              }
-            }}
-            tags={form.style_tags}
-            onRemove={(value) => removeArrayValue("style_tags", value)}
-            chipClassName="rounded-full bg-[#f4f0ff] px-3 py-1.5 text-sm text-[#5a43d6]"
-          />
-
-          <TagSection
-            label="툰비티아이 주제"
-            helper="예: 연애, 직장, 일상, 썰, 괴담, 대학생, 여행, 운동, 군대, 워홀, 공룡"
-            inputValue={topicInput}
-            onInputChange={setTopicInput}
-            onAdd={() => addArrayValue("topic_tags", topicInput, () => setTopicInput(""))}
-            onKeyDown={(event) => {
-              if (isKoreanComposing(event)) {
-                return;
-              }
-              if (event.key === "Enter") {
-                event.preventDefault();
-                addArrayValue("topic_tags", topicInput, () => setTopicInput(""));
-              }
-            }}
-            tags={form.topic_tags}
-            onRemove={(value) => removeArrayValue("topic_tags", value)}
-            chipClassName="rounded-full bg-[#fff8e1] px-3 py-1.5 text-sm text-[#946200]"
-          />
           </div>
           ) : null}
 

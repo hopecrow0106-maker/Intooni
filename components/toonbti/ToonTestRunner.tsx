@@ -1,164 +1,203 @@
 "use client";
 
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-import { TrackedArtistActionLink } from "@/components/TrackedArtistActionLink";
-import { ARTIST_SQUARE_PLACEHOLDER } from "@/lib/placeholders";
-import type { PublicToonTestDTO } from "@/lib/server/toon-tests";
+import {
+  calculateToonbtiResult,
+  type ToonbtiAnswer,
+  type ToonbtiConfig
+} from "@/lib/domain/toonbti";
 
-export function ToonTestRunner({ test }: { test: PublicToonTestDTO }) {
-  const [nodeId, setNodeId] = useState(test.draft.startNodeId);
-  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
-  const node = useMemo(
-    () => test.draft.nodes.find((item) => item.id === nodeId) ?? null,
-    [nodeId, test.draft.nodes]
+type StoredProgress = {
+  started: boolean;
+  questionIndex: number;
+  answers: ToonbtiAnswer[];
+};
+
+function sendEvent(payload: Record<string, string>) {
+  void fetch("/api/toonbti-events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    keepalive: true
+  }).catch(() => undefined);
+}
+
+export function ToonTestRunner({ config }: { config: ToonbtiConfig }) {
+  const router = useRouter();
+  const questions = useMemo(
+    () => [...config.questions].sort((left, right) => left.position - right.position),
+    [config.questions]
   );
+  const storageKey = `intooni:toonbti:${config.test.id}:v${config.test.version}`;
+  const [ready, setReady] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<ToonbtiAnswer[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as StoredProgress;
+        setStarted(Boolean(saved.started));
+        setQuestionIndex(Math.min(Math.max(0, saved.questionIndex ?? 0), questions.length - 1));
+        setAnswers(Array.isArray(saved.answers) ? saved.answers : []);
+      }
+    } catch {
+      window.localStorage.removeItem(storageKey);
+    } finally {
+      setReady(true);
+    }
+  }, [questions.length, storageKey]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const progress: StoredProgress = { started, questionIndex, answers };
+    window.localStorage.setItem(storageKey, JSON.stringify(progress));
+  }, [answers, questionIndex, ready, started, storageKey]);
+
+  const question = questions[questionIndex] ?? null;
   const options = useMemo(
-    () => test.draft.options.filter((option) => option.questionId === nodeId),
-    [nodeId, test.draft.options]
+    () =>
+      question
+        ? config.options
+            .filter((option) => option.questionId === question.id)
+            .sort((left, right) => left.position - right.position)
+        : [],
+    [config.options, question]
   );
-  const artistMap = useMemo(
-    () => new Map(test.artists.map((artist) => [artist.id, artist])),
-    [test.artists]
-  );
+  const selectedOptionId = question
+    ? answers.find((answer) => answer.questionId === question.id)?.optionId
+    : undefined;
 
-  const reset = () => {
-    setNodeId(test.draft.startNodeId);
-    setSelectedOptionIds([]);
+  const begin = () => {
+    setStarted(true);
+    sendEvent({ eventType: "toonbti_start", testId: config.test.id });
   };
 
-  const chooseSingle = (optionId: string, nextNodeId: string) => {
-    setSelectedOptionIds([optionId]);
-    setNodeId(nextNodeId);
-    setSelectedOptionIds([]);
+  const choose = (optionId: string) => {
+    if (!question) return;
+    const nextAnswers = [
+      ...answers.filter((answer) => answer.questionId !== question.id),
+      { questionId: question.id, optionId }
+    ];
+    setAnswers(nextAnswers);
+    sendEvent({
+      eventType: "toonbti_answer",
+      testId: config.test.id,
+      questionId: question.id
+    });
+
+    if (questionIndex < questions.length - 1) {
+      window.setTimeout(() => setQuestionIndex((current) => current + 1), 120);
+      return;
+    }
+
+    const calculation = calculateToonbtiResult(config, nextAnswers);
+    if (!calculation.resultType) return;
+    sendEvent({
+      eventType: "toonbti_complete",
+      testId: config.test.id,
+      resultCode: calculation.code
+    });
+    window.localStorage.removeItem(storageKey);
+    router.push(`/toonbti/result/${encodeURIComponent(calculation.code)}`);
   };
 
-  const continueMulti = () => {
-    const selected = options.filter((option) => selectedOptionIds.includes(option.id));
-    const nextNodeId = selected[selected.length - 1]?.nextNodeId;
-    if (!nextNodeId) return;
-    setNodeId(nextNodeId);
-    setSelectedOptionIds([]);
-  };
-
-  if (!node) {
-    return (
-      <div className="py-20 text-center">
-        <p className="text-slate-500">테스트 경로를 불러오지 못했습니다.</p>
-        <button type="button" onClick={reset} className="mt-5 text-sm font-bold text-[#c9153d]">
-          처음으로
-        </button>
-      </div>
-    );
+  if (!ready) {
+    return <div className="min-h-[calc(100vh-60px)]" aria-label="툰비티아이 불러오는 중" />;
   }
 
-  if (node.type === "result") {
-    const artists = node.artistIds.map((artistId) => artistMap.get(artistId)).filter(Boolean);
+  if (!started) {
     return (
-      <section className="mx-auto w-full max-w-4xl px-5 py-12 text-center md:px-8">
-        {node.imageUrl ? (
-          <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-lg bg-slate-100">
-            <Image src={node.imageUrl} alt={node.title} fill className="object-cover" sizes="384px" />
+      <section className="mx-auto grid min-h-[calc(100vh-60px)] w-full max-w-5xl items-center gap-10 px-5 py-12 md:grid-cols-[minmax(0,1fr)_360px] md:px-8">
+        <div>
+          <p className="text-sm font-black text-[#ff4d6d]">TOON-BTI</p>
+          <h1 className="mt-4 text-4xl font-extrabold leading-tight md:text-6xl">{config.test.title}</h1>
+          <p className="mt-5 max-w-xl whitespace-pre-wrap text-base leading-8 text-slate-600">
+            {config.test.description}
+          </p>
+          <button
+            type="button"
+            onClick={begin}
+            className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#ff4d6d] px-7 text-base font-bold text-white transition hover:bg-[#e93b5d]"
+          >
+            {config.test.startButtonLabel}
+            <ChevronRight size={18} />
+          </button>
+        </div>
+        {config.test.introImageUrl ? (
+          <div className="relative aspect-square overflow-hidden rounded-lg bg-white">
+            <Image
+              src={config.test.introImageUrl}
+              alt=""
+              fill
+              priority
+              className="object-cover"
+              sizes="(max-width: 768px) 90vw, 360px"
+            />
           </div>
-        ) : null}
-        <p className="mt-7 text-sm font-bold text-[#c9153d]">RESULT</p>
-        <h1 className="mt-2 text-4xl font-extrabold text-[#1a1a1a] md:text-5xl">{node.title}</h1>
-        <p className="mx-auto mt-4 max-w-2xl whitespace-pre-wrap text-base leading-8 text-slate-600">
-          {node.description}
-        </p>
-        {node.traits ? <p className="mt-3 text-sm font-semibold text-slate-400">{node.traits}</p> : null}
-
-        {artists.length > 0 ? (
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {artists.map((artist) =>
-              artist ? (
-                <TrackedArtistActionLink
-                  key={artist.id}
-                  artistId={artist.id}
-                  eventType="artist_click"
-                  href={`/artists/${encodeURIComponent(artist.instagram_handle)}`}
-                  target="_self"
-                  className="border border-slate-200 bg-white p-4 text-left transition hover:border-[#ff4d6d]"
-                >
-                  <div className="relative aspect-square overflow-hidden bg-slate-100">
-                    <Image
-                      src={artist.thumbnail_url || ARTIST_SQUARE_PLACEHOLDER}
-                      alt={artist.name}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 100vw, 280px"
-                    />
-                  </div>
-                  <p className="mt-3 text-lg font-bold text-[#1a1a1a]">{artist.name}</p>
-                  <p className="mt-1 text-sm text-slate-500">@{artist.instagram_handle}</p>
-                </TrackedArtistActionLink>
-              ) : null
-            )}
+        ) : (
+          <div className="hidden aspect-square items-center justify-center rounded-lg bg-[#fff0f3] text-7xl font-black text-[#ff4d6d] md:flex">
+            T
           </div>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={reset}
-          className="mt-10 rounded-full border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700"
-        >
-          다시 테스트하기
-        </button>
+        )}
       </section>
     );
   }
 
-  const multi = node.selectionMode === "multi";
+  if (!question) {
+    return <p className="py-24 text-center text-slate-500">활성 질문을 찾지 못했습니다.</p>;
+  }
+
+  const progress = Math.round(((questionIndex + 1) / questions.length) * 100);
   return (
     <section className="mx-auto flex min-h-[calc(100vh-60px)] w-full max-w-3xl items-center px-5 py-12 md:px-8">
       <div className="w-full">
-        <p className="text-sm font-bold text-[#c9153d]">{test.title}</p>
-        <h1 className="mt-3 text-3xl font-extrabold leading-tight text-[#1a1a1a] md:text-5xl">
-          {node.title}
-        </h1>
-        {node.description ? (
-          <p className="mt-4 whitespace-pre-wrap text-base leading-8 text-slate-600">{node.description}</p>
-        ) : null}
-        <div className="mt-8 grid gap-3">
-          {options.map((option) => {
-            const selected = selectedOptionIds.includes(option.id);
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => {
-                  if (!multi) {
-                    chooseSingle(option.id, option.nextNodeId);
-                    return;
-                  }
-                  setSelectedOptionIds((current) => {
-                    if (current.includes(option.id)) return current.filter((id) => id !== option.id);
-                    if (current.length >= node.maxSelections) return current;
-                    return [...current, option.id];
-                  });
-                }}
-                className={`min-h-14 border px-5 py-4 text-left text-base font-bold transition ${
-                  selected
-                    ? "border-[#ff4d6d] bg-[#fff0f3] text-[#c9153d]"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
-                }`}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-        {multi ? (
+        <div className="flex items-center justify-between text-sm font-bold text-slate-500">
           <button
             type="button"
-            disabled={selectedOptionIds.length === 0}
-            onClick={continueMulti}
-            className="mt-5 w-full bg-[#1a1a1a] px-5 py-4 text-sm font-bold text-white disabled:bg-slate-300"
+            disabled={questionIndex === 0}
+            onClick={() => setQuestionIndex((current) => Math.max(0, current - 1))}
+            className="inline-flex items-center gap-1 disabled:invisible"
           >
-            다음
+            <ArrowLeft size={17} />
+            이전
           </button>
-        ) : null}
+          <span>
+            {questionIndex + 1} / {questions.length}
+          </span>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+          <div
+            className="h-full rounded-full bg-[#ff4d6d] transition-[width]"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <p className="mt-10 text-sm font-bold text-[#ff4d6d]">{config.test.title}</p>
+        <h1 className="mt-3 text-3xl font-extrabold leading-tight md:text-5xl">
+          {question.questionText}
+        </h1>
+        <div className="mt-8 grid gap-3">
+          {options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => choose(option.id)}
+              className={`min-h-14 rounded-lg border px-5 py-4 text-left text-base font-bold transition ${
+                selectedOptionId === option.id
+                  ? "border-[#ff4d6d] bg-[#fff0f3] text-[#c9153d]"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-[#ff4d6d]"
+              }`}
+            >
+              {option.optionText}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
   );

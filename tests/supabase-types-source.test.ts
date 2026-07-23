@@ -29,6 +29,13 @@ describe("Supabase generated type wiring", () => {
       "toon_nodes",
       "toon_edges",
       "toon_result_artists",
+      "toonbti_axes",
+      "toonbti_traits",
+      "toonbti_questions",
+      "toonbti_question_options",
+      "toonbti_result_types",
+      "artist_toonbti_types",
+      "toonbti_events",
       "sheet_sync_jobs",
       "migration_legacy_backup"
     ]) {

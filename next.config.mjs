@@ -1,3 +1,5 @@
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
+
 const remotePatterns = [
   {
     protocol: "https",
@@ -28,10 +30,13 @@ if (supabaseUrl) {
 }
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const createNextConfig = (phase) => ({
+  // Keep local HMR output separate from production builds. Running `next build`
+  // while the dev server is open can otherwise leave webpack chunks out of sync.
+  distDir: phase === PHASE_DEVELOPMENT_SERVER ? ".next-dev" : ".next",
   images: {
     remotePatterns
   }
-};
+});
 
-export default nextConfig;
+export default createNextConfig;

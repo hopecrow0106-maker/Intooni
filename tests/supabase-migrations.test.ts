@@ -19,7 +19,8 @@ const migrationFiles = {
   schemaHousekeeping: "202607110009_schema_housekeeping.sql",
   domainClassification: "202607110010_domain_classification.sql",
   publicBioBackfill: "202607130011_backfill_public_bio_from_internal_memo.sql",
-  collaborationSimplification: "202607230012_simplify_artist_collaborations.sql"
+  collaborationSimplification: "202607230012_simplify_artist_collaborations.sql",
+  toonbtiScoring: "202607230013_toonbti_scoring_model.sql"
 } as const;
 
 function readMigration(fileName: string) {
@@ -47,8 +48,32 @@ describe("Supabase refactor migrations", () => {
       migrationFiles.schemaHousekeeping,
       migrationFiles.domainClassification,
       migrationFiles.publicBioBackfill,
-      migrationFiles.collaborationSimplification
+      migrationFiles.collaborationSimplification,
+      migrationFiles.toonbtiScoring
     ]);
+  });
+
+  it("creates the configurable four-axis Toon-BTI scoring model as private source data", () => {
+    const sql = normalizeSql(readMigration(migrationFiles.toonbtiScoring));
+
+    for (const table of [
+      "toonbti_axes",
+      "toonbti_traits",
+      "toonbti_questions",
+      "toonbti_question_options",
+      "toonbti_result_types",
+      "artist_toonbti_types",
+      "toonbti_events"
+    ]) {
+      expect(sql).toContain(`create table if not exists public.${table}`);
+      expect(sql).toContain(`alter table public.${table} enable row level security`);
+    }
+    expect(sql).toContain("score integer not null check (score in (5, 10))");
+    expect(sql).toContain("unique (test_id, code)");
+    expect(sql).toContain("primary key (artist_id, test_id)");
+    expect(sql).toContain("revoke all on public.toonbti_axes from anon, authenticated");
+    expect(sql).toContain("grant select, insert, update, delete on public.toonbti_axes to service_role");
+    expect(sql).not.toMatch(/\b(truncate|drop\s+table)\b/);
   });
 
   it("provides an idempotent baseline so a fresh database has every pre-refactor table", () => {
