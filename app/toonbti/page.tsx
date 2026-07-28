@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ToonTestRunner } from "@/components/toonbti/ToonTestRunner";
+import { listPublicCharacterUrls } from "@/lib/server/public-artists";
 import { getPublishedToonbtiConfig } from "@/lib/server/toonbti";
 import { CANONICAL_SITE_URL } from "@/lib/site";
 
@@ -15,7 +16,12 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function ToonbtiPage() {
-  const config = await getPublishedToonbtiConfig().catch(() => null);
+  const [config, characterUrls] = await Promise.all([
+    getPublishedToonbtiConfig().catch(() => null),
+    listPublicCharacterUrls().catch(() => [])
+  ]);
+  const floatingCharacterUrls = [...characterUrls]
+    .sort(() => Math.random() - 0.5);
 
   return (
     <main className="min-h-screen bg-[#f8f7f4] text-[#1a1a1a]">
@@ -32,7 +38,7 @@ export default async function ToonbtiPage() {
       </nav>
 
       {config ? (
-        <ToonTestRunner config={config} />
+        <ToonTestRunner config={config} characterUrls={floatingCharacterUrls} />
       ) : (
         <section className="mx-auto flex min-h-[calc(100vh-60px)] w-full max-w-3xl items-center justify-center px-5 py-16 text-center md:px-8">
           <div className="w-full border-y border-[#ffd6df] bg-white px-6 py-14 md:px-10">

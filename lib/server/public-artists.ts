@@ -175,6 +175,28 @@ export async function listPublicArtists(): Promise<PublicArtistDTO[]> {
   return mapPublicArtists(rows, statsByArtistId);
 }
 
+export async function listPublicCharacterUrls(): Promise<string[]> {
+  const supabase = getSupabaseAdminClient() as any;
+  const { data, error } = await supabase
+    .from("artists")
+    .select("character_url")
+    .eq("status", "active")
+    .eq("show_on_site", true)
+    .not("character_url", "is", null);
+
+  if (error) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      ((data ?? []) as Array<{ character_url?: string | null }>)
+        .map((row) => row.character_url?.trim() ?? "")
+        .filter(Boolean)
+    )
+  );
+}
+
 export async function getPublicArtistByHandle(handle: string): Promise<PublicArtistDTO | null> {
   const normalizedHandle = normalizeHandle(handle);
   const supabase = getSupabaseAdminClient() as any;

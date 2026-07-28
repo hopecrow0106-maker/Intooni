@@ -83,7 +83,7 @@ export default async function ToonbtiResultPage({ params }: PageProps) {
             <h1 className="mt-2 text-3xl font-extrabold md:text-4xl">{data.resultType.name}</h1>
             <div className="mt-5 flex flex-wrap gap-2">
               {traitNames.map((trait) => (
-                <span key={trait} className="rounded-full bg-[#f1edff] px-3 py-1.5 text-sm font-bold text-[#6d4aff]">
+                <span key={trait} className="rounded-full bg-[#f1edff] px-3 py-1.5 text-sm font-bold text-[#FD4C6C]">
                   {trait}
                 </span>
               ))}

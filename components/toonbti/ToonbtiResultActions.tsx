@@ -86,7 +86,7 @@ async function createCardBlob(data: ResultCardData) {
   const traitY = resultImage ? 975 : 615;
   context.fillStyle = "#f1edff";
   roundedRect(context, 180, traitY, 720, 92, 46);
-  context.fillStyle = "#6d4aff";
+  context.fillStyle = "#FD4C6C";
   context.font = "700 34px sans-serif";
   context.fillText(data.traitNames.join(" · "), 540, traitY + 59);
 

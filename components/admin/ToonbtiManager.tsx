@@ -5,6 +5,7 @@ import {
   Check,
   ChevronRight,
   ImagePlus,
+  Play,
   Plus,
   Save,
   Search,
@@ -13,6 +14,7 @@ import {
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { ToonbtiTestPreview } from "@/components/admin/ToonbtiTestPreview";
 import {
   CANONICAL_TOONBTI_AXES,
   getActiveToonbtiAxes,
@@ -239,6 +241,8 @@ export function ToonbtiManager({ artists }: { artists: Artist[] }) {
   const [notice, setNotice] = useState<Notice>(null);
   const [selectedResultId, setSelectedResultId] = useState("");
   const [questionAxisId, setQuestionAxisId] = useState("");
+  const [selectedQuestionId, setSelectedQuestionId] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [artistSearch, setArtistSearch] = useState("");
   const [artistFilter, setArtistFilter] = useState<"all" | "unassigned" | string>("all");
   const [selectedArtistId, setSelectedArtistId] = useState("");
@@ -297,6 +301,16 @@ export function ToonbtiManager({ artists }: { artists: Artist[] }) {
       setSelectedResultId(sortByPosition(config.resultTypes)[0].id);
     }
   }, [activeAxes, config, questionAxisId, selectedResultId]);
+
+  useEffect(() => {
+    if (!config || !questionAxisId) return;
+    const axisQuestions = sortByPosition(
+      config.questions.filter((question) => question.axisId === questionAxisId)
+    );
+    if (!axisQuestions.some((question) => question.id === selectedQuestionId)) {
+      setSelectedQuestionId(axisQuestions[0]?.id ?? "");
+    }
+  }, [config, questionAxisId, selectedQuestionId]);
 
   const patchConfig = (recipe: (current: ToonbtiConfig) => ToonbtiConfig) => {
     setConfig((current) => (current ? recipe(current) : current));
@@ -635,166 +649,372 @@ export function ToonbtiManager({ artists }: { artists: Artist[] }) {
       ) : null}
 
       {activeTab === "questions" ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h3 className="text-base font-bold text-ink">축별 질문과 답변</h3>
-              <p className="mt-1 text-xs text-slate-500">
-                각 축에 질문 4개를 설정합니다. 현재 선택 축 {selectedAxisQuestionCount}/4
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <select
-                value={questionAxisId}
-                onChange={(event) => setQuestionAxisId(event.target.value)}
-                className={`${inputClass} min-w-40`}
-              >
-                {sortByPosition(config.axes).map((axis) => (
-                  <option key={axis.id} value={axis.id}>
-                    {axis.name}
-                  </option>
-                ))}
-              </select>
+        <section className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-base font-bold text-ink">축별 질문 설계</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  질문을 축별로 분류하고, 한 문항씩 선택해 질문과 네 가지 답변을 정리합니다.
+                </p>
+              </div>
               <button
                 type="button"
-                disabled={!questionAxisId || selectedAxisQuestionCount >= 4}
-                onClick={() => {
-                  if (selectedAxisQuestionCount >= 4) return;
-                  const axis = config.axes.find((item) => item.id === questionAxisId);
-                  const traits = config.traits.filter((trait) => trait.axisId === questionAxisId);
-                  if (!axis || traits.length !== 2) return;
-                  const built = buildQuestion(
-                    config.test.id,
-                    axis,
-                    traits,
-                    Math.max(-1, ...config.questions.map((question) => question.position)) + 1
-                  );
-                  patchConfig((current) => ({
-                    ...current,
-                    questions: [...current.questions, built.question],
-                    options: [...current.options, ...built.options]
-                  }));
-                }}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
+                onClick={() => setPreviewOpen(true)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white"
               >
-                <Plus size={16} /> {selectedAxisQuestionCount >= 4 ? "4개 설정 완료" : "질문 추가"}
+                <Play size={16} fill="currentColor" />
+                예상 테스트 실시하기
               </button>
             </div>
-          </div>
-          <div className="mt-5 space-y-4">
-            {sortByPosition(
-              config.questions.filter((question) => question.axisId === questionAxisId)
-            ).map((question, questionIndex) => {
-              const axis = config.axes.find((item) => item.id === question.axisId);
-              const traits = getActiveTraitsForAxis(config, question.axisId);
-              const questionOptions = sortByPosition(
-                config.options.filter((option) => option.questionId === question.id)
-              );
-              return (
-                <article key={question.id} className="rounded-lg border border-slate-200 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm font-bold text-slate-800">
-                      Q{questionIndex + 1} · {axis?.name}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                      {question.isActive ? "활성" : "비활성"}
-                      <Toggle
-                        active={question.isActive}
-                        label="질문 활성화"
-                        onClick={() =>
-                          patchConfig((current) => ({
-                            ...current,
-                            questions: replaceById(current.questions, question.id, {
-                              isActive: !question.isActive
-                            })
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <FieldLabel label="질문 문구">
-                      <input
-                        value={question.questionText}
-                        onChange={(event) =>
-                          patchConfig((current) => ({
-                            ...current,
-                            questions: replaceById(current.questions, question.id, {
-                              questionText: event.target.value
-                            })
-                          }))
-                        }
-                        className={inputClass}
-                      />
-                    </FieldLabel>
-                  </div>
-                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    {questionOptions.map((option, optionIndex) => (
-                      <div key={option.id} className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[11px] font-semibold text-slate-500">
-                          {["왼쪽 성향 강함", "왼쪽 성향 약함", "오른쪽 성향 약함", "오른쪽 성향 강함"][optionIndex] || `답변 ${optionIndex + 1}`}
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {sortByPosition(config.axes).map((axis, axisIndex) => {
+                const traits = getActiveTraitsForAxis(config, axis.id);
+                const axisQuestions = sortByPosition(
+                  config.questions.filter((question) => question.axisId === axis.id)
+                );
+                const completedCount = axisQuestions.filter((question) => {
+                  const options = config.options.filter(
+                    (option) => option.questionId === question.id
+                  );
+                  return (
+                    Boolean(question.questionText.trim()) &&
+                    options.length === 4 &&
+                    options.every((option) => Boolean(option.optionText.trim()))
+                  );
+                }).length;
+                const selected = questionAxisId === axis.id;
+                return (
+                  <button
+                    key={axis.id}
+                    type="button"
+                    onClick={() => setQuestionAxisId(axis.id)}
+                    className={`min-h-32 rounded-lg border p-4 text-left transition ${
+                      selected
+                        ? "border-blue-500 bg-blue-50 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className={`text-xs font-bold ${selected ? "text-blue-700" : "text-slate-400"}`}>
+                          {axisIndex + 1}축
                         </p>
-                        <input
-                          value={option.optionText}
-                          onChange={(event) =>
-                            patchConfig((current) => ({
-                              ...current,
-                              options: replaceById(current.options, option.id, {
-                                optionText: event.target.value
-                              })
-                            }))
-                          }
-                          placeholder="답변 문구"
-                          className={`${inputClass} mt-2`}
-                        />
-                        <div className="mt-2 grid grid-cols-[1fr_100px] gap-2">
-                          <select
-                            value={option.traitId}
-                            onChange={(event) =>
+                        <p className="mt-1 text-lg font-extrabold text-slate-900">
+                          {traits.map((trait) => trait.code).join(" / ")}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-md px-2 py-1 text-[11px] font-bold ${
+                          completedCount === 4
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {completedCount}/4 완료
+                      </span>
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">
+                      {CANONICAL_TOONBTI_AXES[axisIndex]?.summary}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {(() => {
+            const axis = config.axes.find((item) => item.id === questionAxisId);
+            const axisIndex = sortByPosition(config.axes).findIndex(
+              (item) => item.id === questionAxisId
+            );
+            const traits = axis ? getActiveTraitsForAxis(config, axis.id) : [];
+            const axisQuestions = sortByPosition(
+              config.questions.filter((question) => question.axisId === questionAxisId)
+            );
+            const selectedQuestion =
+              axisQuestions.find((question) => question.id === selectedQuestionId) ??
+              axisQuestions[0] ??
+              null;
+            const selectedQuestionIndex = selectedQuestion
+              ? axisQuestions.findIndex((question) => question.id === selectedQuestion.id)
+              : -1;
+            const selectedOptions = selectedQuestion
+              ? sortByPosition(
+                  config.options.filter(
+                    (option) => option.questionId === selectedQuestion.id
+                  )
+                )
+              : [];
+
+            return (
+              <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+                <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="border-b border-slate-100 pb-4">
+                    <p className="text-xs font-bold text-blue-600">
+                      {axisIndex >= 0 ? `${axisIndex + 1}축 질문` : "질문 목록"}
+                    </p>
+                    <p className="mt-1 text-sm font-extrabold text-slate-900">
+                      {traits.length === 2
+                        ? `${traits[0].code} ${traits[0].name} ↔ ${traits[1].code} ${traits[1].name}`
+                        : "성향축을 선택해 주세요"}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      현재 {selectedAxisQuestionCount}/4문항
+                    </p>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {axisQuestions.map((question, questionIndex) => {
+                      const options = config.options.filter(
+                        (option) => option.questionId === question.id
+                      );
+                      const completed =
+                        Boolean(question.questionText.trim()) &&
+                        options.length === 4 &&
+                        options.every((option) => Boolean(option.optionText.trim()));
+                      return (
+                        <button
+                          key={question.id}
+                          type="button"
+                          onClick={() => setSelectedQuestionId(question.id)}
+                          className={`w-full rounded-lg border p-3 text-left transition ${
+                            selectedQuestion?.id === question.id
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-black text-slate-700">
+                              Q{questionIndex + 1}
+                            </span>
+                            <span
+                              className={`text-[11px] font-bold ${
+                                completed ? "text-emerald-600" : "text-amber-600"
+                              }`}
+                            >
+                              {completed ? "작성 완료" : "작성 중"}
+                            </span>
+                          </div>
+                          <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-slate-600">
+                            {question.questionText || "질문 문구를 입력해 주세요."}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!questionAxisId || selectedAxisQuestionCount >= 4}
+                    onClick={() => {
+                      if (selectedAxisQuestionCount >= 4) return;
+                      const selectedAxis = config.axes.find(
+                        (item) => item.id === questionAxisId
+                      );
+                      const selectedTraits = config.traits.filter(
+                        (trait) => trait.axisId === questionAxisId
+                      );
+                      if (!selectedAxis || selectedTraits.length !== 2) return;
+                      const built = buildQuestion(
+                        config.test.id,
+                        selectedAxis,
+                        selectedTraits,
+                        Math.max(-1, ...config.questions.map((question) => question.position)) + 1
+                      );
+                      patchConfig((current) => ({
+                        ...current,
+                        questions: [...current.questions, built.question],
+                        options: [...current.options, ...built.options]
+                      }));
+                      setSelectedQuestionId(built.question.id);
+                    }}
+                    className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 disabled:opacity-40"
+                  >
+                    <Plus size={15} />
+                    {selectedAxisQuestionCount >= 4 ? "질문 4개 설정 완료" : "질문 추가"}
+                  </button>
+                </aside>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  {selectedQuestion ? (
+                    <>
+                      <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-slate-900 px-2.5 py-1 text-xs font-black text-white">
+                              Q{selectedQuestionIndex + 1}
+                            </span>
+                            <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                              측정 축 · {axisIndex + 1}축
+                            </span>
+                            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                              {traits.map((trait) => trait.code).join(" ↔ ")}
+                            </span>
+                          </div>
+                          <h4 className="mt-3 text-lg font-extrabold text-slate-900">
+                            질문과 응답 분류
+                          </h4>
+                          <p className="mt-1 text-xs leading-5 text-slate-500">
+                            네 답변은 양쪽 성향의 강한 선택과 약한 선택으로 각각 연결됩니다.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                          {selectedQuestion.isActive ? "활성 질문" : "비활성 질문"}
+                          <Toggle
+                            active={selectedQuestion.isActive}
+                            label="질문 활성화"
+                            onClick={() =>
                               patchConfig((current) => ({
                                 ...current,
-                                options: replaceById(current.options, option.id, {
-                                  traitId: event.target.value,
-                                  axisId: question.axisId
-                                })
+                                questions: replaceById(
+                                  current.questions,
+                                  selectedQuestion.id,
+                                  { isActive: !selectedQuestion.isActive }
+                                )
                               }))
                             }
-                            className={inputClass}
-                          >
-                            {traits.map((trait) => (
-                              <option key={trait.id} value={trait.id}>
-                                {trait.code} {trait.name}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            value={String(option.score)}
-                            onChange={(event) =>
-                              patchConfig((current) => ({
-                                ...current,
-                                options: replaceById(current.options, option.id, {
-                                  score: Number(event.target.value) as 5 | 10
-                                })
-                              }))
-                            }
-                            className={inputClass}
-                          >
-                            <option value="5">5점</option>
-                            <option value="10">10점</option>
-                          </select>
+                          />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </article>
-              );
-            })}
-            {config.questions.filter((question) => question.axisId === questionAxisId).length === 0 ? (
-              <p className="rounded-lg bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-                이 축에 등록된 질문이 없습니다.
-              </p>
-            ) : null}
-          </div>
+
+                      <div className="mt-5">
+                        <FieldLabel
+                          label="질문 문구"
+                          hint="사용자가 실제 테스트에서 가장 크게 읽게 되는 문장입니다."
+                        >
+                          <textarea
+                            rows={3}
+                            value={selectedQuestion.questionText}
+                            onChange={(event) =>
+                              patchConfig((current) => ({
+                                ...current,
+                                questions: replaceById(
+                                  current.questions,
+                                  selectedQuestion.id,
+                                  { questionText: event.target.value }
+                                )
+                              }))
+                            }
+                            placeholder="예: 이야기를 볼 때 더 끌리는 쪽은?"
+                            className={`${textareaClass} text-base font-semibold leading-7`}
+                          />
+                        </FieldLabel>
+                      </div>
+
+                      <div className="mt-5 grid gap-3 md:grid-cols-2">
+                        {selectedOptions.map((option, optionIndex) => {
+                          const trait = traits.find(
+                            (candidate) => candidate.id === option.traitId
+                          );
+                          const strong = option.score === 10;
+                          const left = trait?.id === traits[0]?.id;
+                          return (
+                            <div
+                              key={option.id}
+                              className={`rounded-lg border p-4 ${
+                                left
+                                  ? "border-blue-200 bg-blue-50/50"
+                                  : "border-rose-200 bg-rose-50/50"
+                              }`}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`flex h-8 w-8 items-center justify-center rounded-md font-mono text-sm font-black text-white ${
+                                      left ? "bg-blue-600" : "bg-rose-500"
+                                    }`}
+                                  >
+                                    {trait?.code || "?"}
+                                  </span>
+                                  <div>
+                                    <p className="text-xs font-extrabold text-slate-800">
+                                      {trait?.name || "성향 미지정"}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500">
+                                      {strong ? "강한 선택" : "약한 선택"} · {option.score}점
+                                    </p>
+                                  </div>
+                                </div>
+                                <span className="text-[11px] font-bold text-slate-400">
+                                  답변 {optionIndex + 1}
+                                </span>
+                              </div>
+
+                              <input
+                                value={option.optionText}
+                                onChange={(event) =>
+                                  patchConfig((current) => ({
+                                    ...current,
+                                    options: replaceById(current.options, option.id, {
+                                      optionText: event.target.value
+                                    })
+                                  }))
+                                }
+                                placeholder="사용자에게 보일 답변 문구"
+                                className={`${inputClass} mt-3`}
+                              />
+
+                              <div className="mt-3 grid grid-cols-[1fr_100px] gap-2">
+                                <select
+                                  aria-label={`답변 ${optionIndex + 1} 연결 성향`}
+                                  value={option.traitId}
+                                  onChange={(event) =>
+                                    patchConfig((current) => ({
+                                      ...current,
+                                      options: replaceById(current.options, option.id, {
+                                        traitId: event.target.value,
+                                        axisId: selectedQuestion.axisId
+                                      })
+                                    }))
+                                  }
+                                  className={inputClass}
+                                >
+                                  {traits.map((candidate) => (
+                                    <option key={candidate.id} value={candidate.id}>
+                                      {candidate.code} · {candidate.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  aria-label={`답변 ${optionIndex + 1} 점수`}
+                                  value={String(option.score)}
+                                  onChange={(event) =>
+                                    patchConfig((current) => ({
+                                      ...current,
+                                      options: replaceById(current.options, option.id, {
+                                        score: Number(event.target.value) as 5 | 10
+                                      })
+                                    }))
+                                  }
+                                  className={inputClass}
+                                >
+                                  <option value="5">5점</option>
+                                  <option value="10">10점</option>
+                                </select>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex min-h-80 items-center justify-center text-center">
+                      <div>
+                        <p className="text-sm font-bold text-slate-700">
+                          편집할 질문이 없습니다.
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          왼쪽에서 질문을 추가해 주세요.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </section>
       ) : null}
 
@@ -1188,6 +1408,16 @@ export function ToonbtiManager({ artists }: { artists: Artist[] }) {
             )}
           </div>
         </section>
+      ) : null}
+
+      {previewOpen ? (
+        <ToonbtiTestPreview
+          config={config}
+          characterUrls={Array.from(
+            new Set(artists.map((artist) => artist.character_url.trim()).filter(Boolean))
+          )}
+          onClose={() => setPreviewOpen(false)}
+        />
       ) : null}
     </div>
   );
