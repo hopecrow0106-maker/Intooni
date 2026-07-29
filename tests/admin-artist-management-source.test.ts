@@ -72,8 +72,12 @@ describe("Admin artist management surface", () => {
     expect(adminPage).toContain('.filter((item) => item.status === "active")');
     expect(adminPage).toContain("대표 게시물 링크 누락");
     expect(adminPage).toContain('selectDataEnrichmentCategory("gallery-posts")');
+    expect(adminPage).toContain('selectDataEnrichmentCategory("toonbti")');
+    expect(adminPage).toContain("툰비티아이 누락만");
     expect(adminPage).toContain("필터 초기화");
     expect(artistTable).toContain("대표 게시물 {galleryPostCount}/4");
+    expect(artistTable).toContain("툰비티아이 누락");
+    expect(artistTable).toContain("toonbtiAssignedArtistIds.has(artist.id)");
     expect(artistTable).toContain("보관");
     expect(artistTable).not.toContain(">\n                          삭제\n");
   });

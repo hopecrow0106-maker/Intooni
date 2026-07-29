@@ -9,6 +9,7 @@ import { GrowthAnalyticsDashboard } from "@/components/admin/GrowthAnalyticsDash
 import { MagazineForm, type MagazineFormValues } from "@/components/admin/MagazineForm";
 import { MagazineTable } from "@/components/admin/MagazineTable";
 import { ToonbtiManager } from "@/components/admin/ToonbtiManager";
+import { ToonbtiStatisticsDashboard } from "@/components/admin/ToonbtiStatisticsDashboard";
 import {
   type ArtistStatsPeriod,
   type ArtistStatsSummary
@@ -16,6 +17,7 @@ import {
 import type { Artist, Category, Magazine } from "@/lib/types";
 import { normalizeInstagramHandle } from "@/lib/normalize";
 import type { AdminGrowthAnalytics } from "@/lib/domain/admin-growth-analytics";
+import type { AdminToonbtiAnalytics } from "@/lib/domain/admin-toonbti-analytics";
 
 type DebugError = {
   action: string;
@@ -268,6 +270,26 @@ async function requestGrowthAnalytics() {
         source: "app/admin/page.tsx > requestGrowthAnalytics",
         endpoint: "/api/admin/statistics/growth",
         message: data.message ?? "성장 통계를 불러오지 못했습니다."
+      } satisfies DebugError
+    };
+  }
+  return { data: data.analytics, error: null as DebugError | null };
+}
+
+async function requestToonbtiAnalytics() {
+  const response = await fetch("/api/admin/statistics/toonbti", { cache: "no-store" });
+  const data = (await response.json()) as {
+    analytics?: AdminToonbtiAnalytics;
+    message?: string;
+  };
+  if (!response.ok || !data.analytics) {
+    return {
+      data: null,
+      error: {
+        action: "툰-비티아이 통계 조회",
+        source: "app/admin/page.tsx > requestToonbtiAnalytics",
+        endpoint: "/api/admin/statistics/toonbti",
+        message: data.message ?? "툰-비티아이 작가 통계를 불러오지 못했습니다."
       } satisfies DebugError
     };
   }
@@ -1123,6 +1145,7 @@ export default function AdminPage() {
   const [artistStats, setArtistStats] = useState<Record<string, ArtistStatsSummary>>({});
   const [searchQueries, setSearchQueries] = useState<SearchQuerySummary[]>([]);
   const [growthAnalytics, setGrowthAnalytics] = useState<AdminGrowthAnalytics | null>(null);
+  const [toonbtiAnalytics, setToonbtiAnalytics] = useState<AdminToonbtiAnalytics | null>(null);
   const [statsPeriod, setStatsPeriod] = useState<ArtistStatsPeriod>("all");
   const [artistSearch, setArtistSearch] = useState("");
   const [showAllArtistStats, setShowAllArtistStats] = useState(false);
@@ -1133,6 +1156,7 @@ export default function AdminPage() {
   const [showHiddenTagMissingOnly, setShowHiddenTagMissingOnly] = useState(false);
   const [showCharacterMissingOnly, setShowCharacterMissingOnly] = useState(false);
   const [showGalleryMissingOnly, setShowGalleryMissingOnly] = useState(false);
+  const [showToonbtiMissingOnly, setShowToonbtiMissingOnly] = useState(false);
   const [showDataEnrichmentPanel, setShowDataEnrichmentPanel] = useState(false);
   const [visibilityFilter, setVisibilityFilter] = useState<"all" | "public" | "private">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden" | "archived">("all");
@@ -1152,6 +1176,7 @@ export default function AdminPage() {
     setShowHiddenTagMissingOnly(false);
     setShowCharacterMissingOnly(false);
     setShowGalleryMissingOnly(false);
+    setShowToonbtiMissingOnly(false);
     setVisibilityFilter("all");
     setStatusFilter("all");
     setGrowthFilter("all");
@@ -1165,6 +1190,7 @@ export default function AdminPage() {
     !showHiddenTagMissingOnly &&
     !showCharacterMissingOnly &&
     !showGalleryMissingOnly &&
+    !showToonbtiMissingOnly &&
     visibilityFilter === "all" &&
     statusFilter === "archived" &&
     growthFilter === "all" &&
@@ -1177,6 +1203,7 @@ export default function AdminPage() {
     !showHiddenTagMissingOnly &&
     !showCharacterMissingOnly &&
     !showGalleryMissingOnly &&
+    !showToonbtiMissingOnly &&
     visibilityFilter === "all" &&
     statusFilter === "hidden" &&
     growthFilter === "all" &&
@@ -1255,6 +1282,12 @@ export default function AdminPage() {
     return result.error;
   }, []);
 
+  const fetchToonbtiAnalytics = useCallback(async () => {
+    const result = await requestToonbtiAnalytics();
+    setToonbtiAnalytics(result.data);
+    return result.error;
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -1273,13 +1306,21 @@ export default function AdminPage() {
 
       setAuthenticated(true);
 
-      const [artistsError, categoriesError, magazinesError, statsError, searchQueryError] =
+      const [
+        artistsError,
+        categoriesError,
+        magazinesError,
+        statsError,
+        searchQueryError,
+        toonbtiError
+      ] =
         await Promise.all([
         fetchArtists(),
         fetchCategories(),
         fetchMagazines(),
         fetchArtistStats("all"),
-        fetchSearchQueries("all")
+        fetchSearchQueries("all"),
+        fetchToonbtiAnalytics()
       ]);
 
       if (!mounted) {
@@ -1291,7 +1332,8 @@ export default function AdminPage() {
         categoriesError,
         magazinesError,
         statsError,
-        searchQueryError
+        searchQueryError,
+        toonbtiError
       );
       setLoading(false);
     };
@@ -1301,10 +1343,18 @@ export default function AdminPage() {
     return () => {
       mounted = false;
     };
-  }, [fetchArtistStats, fetchArtists, fetchCategories, fetchMagazines, fetchSearchQueries, router]);
+  }, [
+    fetchArtistStats,
+    fetchArtists,
+    fetchCategories,
+    fetchMagazines,
+    fetchSearchQueries,
+    fetchToonbtiAnalytics,
+    router
+  ]);
 
   useEffect(() => {
-    if (!authenticated) {
+    if (!authenticated || activeTab !== "statistics") {
       return;
     }
 
@@ -1337,7 +1387,33 @@ export default function AdminPage() {
         current.filter((item) => item.endpoint !== "/api/admin/statistics/growth")
       );
     });
-  }, [authenticated, fetchArtistStats, fetchGrowthAnalytics, fetchSearchQueries, statsPeriod]);
+  }, [
+    activeTab,
+    authenticated,
+    fetchArtistStats,
+    fetchGrowthAnalytics,
+    fetchSearchQueries,
+    statsPeriod
+  ]);
+
+  useEffect(() => {
+    if (
+      !authenticated ||
+      (activeTab !== "artists" && activeTab !== "statistics")
+    ) {
+      return;
+    }
+
+    void fetchToonbtiAnalytics().then((error) => {
+      if (error) {
+        pushDebugError(error);
+        return;
+      }
+      setDebugErrors((current) =>
+        current.filter((item) => item.endpoint !== "/api/admin/statistics/toonbti")
+      );
+    });
+  }, [activeTab, authenticated, fetchToonbtiAnalytics]);
 
   const persistArtist = async (payload: ArtistFormValues) => {
     setSaving(true);
@@ -1364,7 +1440,11 @@ export default function AdminPage() {
       }
 
       clearDebugErrors();
-      await Promise.all([fetchArtists(), fetchArtistStats(statsPeriod)]);
+      await Promise.all([
+        fetchArtists(),
+        fetchArtistStats(statsPeriod),
+        fetchToonbtiAnalytics()
+      ]);
       setArtistFormOpen(false);
       setSelectedArtist(null);
     } finally {
@@ -1724,6 +1804,11 @@ export default function AdminPage() {
     [artists, duplicateInstagramHandleIds]
   );
 
+  const toonbtiAssignedArtistIds = useMemo(
+    () => new Set(toonbtiAnalytics?.assigned_artist_ids ?? []),
+    [toonbtiAnalytics]
+  );
+
   const filteredSortedArtists = useMemo(() => {
     const query = artistSearch.trim().toLowerCase();
     let baseArtists = sortedArtists;
@@ -1743,6 +1828,12 @@ export default function AdminPage() {
         (artist) =>
           artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length <
           REQUIRED_GALLERY_POST_COUNT
+      );
+    }
+
+    if (showToonbtiMissingOnly) {
+      baseArtists = baseArtists.filter(
+        (artist) => !toonbtiAssignedArtistIds.has(artist.id)
       );
     }
 
@@ -1774,6 +1865,7 @@ export default function AdminPage() {
             !artist.last_stats_updated_at ||
             !artist.search_tags.length ||
             !artist.character_url.trim() ||
+            !toonbtiAssignedArtistIds.has(artist.id) ||
             artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length <
               REQUIRED_GALLERY_POST_COUNT
           );
@@ -1814,7 +1906,9 @@ export default function AdminPage() {
     showCharacterMissingOnly,
     showGalleryMissingOnly,
     showHiddenTagMissingOnly,
+    showToonbtiMissingOnly,
     statusFilter,
+    toonbtiAssignedArtistIds,
     trendingFilter,
     visibilityFilter,
     sortedArtists
@@ -1843,6 +1937,13 @@ export default function AdminPage() {
     [sortedArtists]
   );
 
+  const toonbtiMissingCount = useMemo(
+    () =>
+      sortedArtists.filter((artist) => !toonbtiAssignedArtistIds.has(artist.id))
+        .length,
+    [sortedArtists, toonbtiAssignedArtistIds]
+  );
+
   const dataEnrichmentNeededCount = useMemo(
     () =>
       new Set([
@@ -1856,17 +1957,21 @@ export default function AdminPage() {
               artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length <
               REQUIRED_GALLERY_POST_COUNT
           )
+          .map((artist) => artist.id),
+        ...sortedArtists
+          .filter((artist) => !toonbtiAssignedArtistIds.has(artist.id))
           .map((artist) => artist.id)
       ]).size,
-    [sortedArtists]
+    [sortedArtists, toonbtiAssignedArtistIds]
   );
 
   const selectDataEnrichmentCategory = (
-    category: "search-tags" | "character-png" | "gallery-posts"
+    category: "search-tags" | "character-png" | "gallery-posts" | "toonbti"
   ) => {
     setShowHiddenTagMissingOnly(category === "search-tags");
     setShowCharacterMissingOnly(category === "character-png");
     setShowGalleryMissingOnly(category === "gallery-posts");
+    setShowToonbtiMissingOnly(category === "toonbti");
   };
 
   useEffect(() => {
@@ -2230,6 +2335,13 @@ export default function AdminPage() {
               >
                 대표 게시물 누락만 {formatNumber(galleryMissingCount)}
               </button>
+              <button
+                type="button"
+                onClick={() => setShowToonbtiMissingOnly((current) => !current)}
+                className={getAdminControlClass(showToonbtiMissingOnly)}
+              >
+                툰비티아이 누락만 {formatNumber(toonbtiMissingCount)}
+              </button>
             </div>
 
             <div className="flex max-w-2xl flex-col gap-2 sm:flex-row">
@@ -2316,7 +2428,7 @@ export default function AdminPage() {
             <StatsCard
               label="데이터 보강 필요"
               value={formatNumber(dataEnrichmentNeededCount)}
-              helper="검색 태그, 캐릭터 이미지 또는 대표 게시물 누락"
+              helper="검색 태그, 캐릭터, 대표 게시물, 툰비티아이 누락"
               onClick={() => setShowDataEnrichmentPanel((current) => !current)}
               active={showDataEnrichmentPanel}
             />
@@ -2335,23 +2447,33 @@ export default function AdminPage() {
                     setShowHiddenTagMissingOnly(false);
                     setShowCharacterMissingOnly(false);
                     setShowGalleryMissingOnly(false);
+                    setShowToonbtiMissingOnly(false);
                   }}
                   className={getAdminControlClass(
-                    !showHiddenTagMissingOnly && !showCharacterMissingOnly && !showGalleryMissingOnly
+                    !showHiddenTagMissingOnly &&
+                      !showCharacterMissingOnly &&
+                      !showGalleryMissingOnly &&
+                      !showToonbtiMissingOnly
                   )}
                 >
                   전체 작가 보기
                 </button>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 <button
                   type="button"
                   onClick={() => selectDataEnrichmentCategory("search-tags")}
                   aria-pressed={
-                    showHiddenTagMissingOnly && !showCharacterMissingOnly && !showGalleryMissingOnly
+                    showHiddenTagMissingOnly &&
+                    !showCharacterMissingOnly &&
+                    !showGalleryMissingOnly &&
+                    !showToonbtiMissingOnly
                   }
                   className={`rounded-lg border px-4 py-3 text-left transition ${
-                    showHiddenTagMissingOnly && !showCharacterMissingOnly && !showGalleryMissingOnly
+                    showHiddenTagMissingOnly &&
+                    !showCharacterMissingOnly &&
+                    !showGalleryMissingOnly &&
+                    !showToonbtiMissingOnly
                       ? "border-orange-500 bg-orange-50"
                       : "border-orange-100 bg-orange-50/50 hover:border-orange-300"
                   }`}
@@ -2363,10 +2485,16 @@ export default function AdminPage() {
                   type="button"
                   onClick={() => selectDataEnrichmentCategory("character-png")}
                   aria-pressed={
-                    showCharacterMissingOnly && !showHiddenTagMissingOnly && !showGalleryMissingOnly
+                    showCharacterMissingOnly &&
+                    !showHiddenTagMissingOnly &&
+                    !showGalleryMissingOnly &&
+                    !showToonbtiMissingOnly
                   }
                   className={`rounded-lg border px-4 py-3 text-left transition ${
-                    showCharacterMissingOnly && !showHiddenTagMissingOnly && !showGalleryMissingOnly
+                    showCharacterMissingOnly &&
+                    !showHiddenTagMissingOnly &&
+                    !showGalleryMissingOnly &&
+                    !showToonbtiMissingOnly
                       ? "border-sky-500 bg-sky-50"
                       : "border-sky-100 bg-sky-50/50 hover:border-sky-300"
                   }`}
@@ -2378,10 +2506,16 @@ export default function AdminPage() {
                   type="button"
                   onClick={() => selectDataEnrichmentCategory("gallery-posts")}
                   aria-pressed={
-                    showGalleryMissingOnly && !showHiddenTagMissingOnly && !showCharacterMissingOnly
+                    showGalleryMissingOnly &&
+                    !showHiddenTagMissingOnly &&
+                    !showCharacterMissingOnly &&
+                    !showToonbtiMissingOnly
                   }
                   className={`rounded-lg border px-4 py-3 text-left transition ${
-                    showGalleryMissingOnly && !showHiddenTagMissingOnly && !showCharacterMissingOnly
+                    showGalleryMissingOnly &&
+                    !showHiddenTagMissingOnly &&
+                    !showCharacterMissingOnly &&
+                    !showToonbtiMissingOnly
                       ? "border-violet-500 bg-violet-50"
                       : "border-violet-100 bg-violet-50/50 hover:border-violet-300"
                   }`}
@@ -2389,6 +2523,31 @@ export default function AdminPage() {
                   <span className="block text-sm font-semibold text-violet-800">대표 게시물 링크 누락</span>
                   <span className="mt-1 block text-xs text-violet-700">
                     {formatNumber(galleryMissingCount)}명 · 4개 슬롯을 모두 채워 주세요
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectDataEnrichmentCategory("toonbti")}
+                  aria-pressed={
+                    showToonbtiMissingOnly &&
+                    !showHiddenTagMissingOnly &&
+                    !showCharacterMissingOnly &&
+                    !showGalleryMissingOnly
+                  }
+                  className={`rounded-lg border px-4 py-3 text-left transition ${
+                    showToonbtiMissingOnly &&
+                    !showHiddenTagMissingOnly &&
+                    !showCharacterMissingOnly &&
+                    !showGalleryMissingOnly
+                      ? "border-rose-500 bg-rose-50"
+                      : "border-rose-100 bg-rose-50/50 hover:border-rose-300"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-rose-800">
+                    툰비티아이 누락
+                  </span>
+                  <span className="mt-1 block text-xs text-rose-700">
+                    {formatNumber(toonbtiMissingCount)}명 · 작가 기본 정보에서 유형을 지정해 주세요
                   </span>
                 </button>
               </div>
@@ -2470,6 +2629,10 @@ export default function AdminPage() {
 
           {growthAnalytics ? <GrowthAnalyticsDashboard analytics={growthAnalytics} /> : null}
 
+          {toonbtiAnalytics ? (
+            <ToonbtiStatisticsDashboard analytics={toonbtiAnalytics} />
+          ) : null}
+
           <section className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             <StatsCard
               label="작가 총 반응"
@@ -2489,7 +2652,7 @@ export default function AdminPage() {
             <StatsCard
               label="데이터 보강 필요"
               value={formatNumber(dataEnrichmentNeededCount)}
-              helper="검색 태그, 누끼 PNG, 대표 게시물 누락 작가"
+              helper="검색 태그, 누끼 PNG, 대표 게시물, 툰비티아이 누락 작가"
             />
           </section>
 
@@ -2736,6 +2899,7 @@ export default function AdminPage() {
             <ArtistTable
               artists={paginatedArtists}
               duplicateInstagramHandleIds={duplicateInstagramHandleIds}
+              toonbtiAssignedArtistIds={toonbtiAssignedArtistIds}
               statsByArtistId={artistStats}
               statsPeriod={statsPeriod}
               onEdit={(artist) => {
@@ -2803,6 +2967,7 @@ export default function AdminPage() {
           }
           setArtistFormOpen(false);
           setSelectedArtist(null);
+          void fetchToonbtiAnalytics();
         }}
         onSave={persistArtist}
         onCategoriesChanged={async () => {

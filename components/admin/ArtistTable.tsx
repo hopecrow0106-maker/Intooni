@@ -20,6 +20,7 @@ import type { Artist } from "@/lib/types";
 type ArtistTableProps = {
   artists: Artist[];
   duplicateInstagramHandleIds?: Set<string>;
+  toonbtiAssignedArtistIds?: Set<string>;
   statsByArtistId: Record<string, ArtistStatsSummary>;
   statsPeriod: ArtistStatsPeriod;
   onEdit: (artist: Artist) => void;
@@ -61,13 +62,13 @@ function getStatusLabel(status: Artist["status"]) {
   return "보관";
 }
 
-function DataBadges({ artist }: { artist: Artist }) {
+function DataBadges({ artist, hasToonbti }: { artist: Artist; hasToonbti: boolean }) {
   const missingSearchTags = artist.search_tags.map((tag) => tag.trim()).filter(Boolean).length === 0;
   const missingCharacter = !artist.character_url.trim();
   const galleryPostCount = artist.gallery_post_urls.map((url) => url.trim()).filter(Boolean).length;
   const missingGalleryPosts = galleryPostCount < 4;
 
-  if (!missingSearchTags && !missingCharacter && !missingGalleryPosts) {
+  if (!missingSearchTags && !missingCharacter && !missingGalleryPosts && hasToonbti) {
     return <span className="text-xs font-medium text-emerald-600">정상</span>;
   }
 
@@ -86,6 +87,11 @@ function DataBadges({ artist }: { artist: Artist }) {
       {missingGalleryPosts ? (
         <span className="rounded bg-violet-50 px-1.5 py-1 text-[11px] font-semibold text-violet-700">
           대표 게시물 {galleryPostCount}/4
+        </span>
+      ) : null}
+      {!hasToonbti ? (
+        <span className="rounded bg-rose-50 px-1.5 py-1 text-[11px] font-semibold text-rose-700">
+          툰비티아이 누락
         </span>
       ) : null}
     </div>
@@ -115,6 +121,7 @@ function MiniSwitch({ active, label, onClick }: { active: boolean; label: string
 export function ArtistTable({
   artists,
   duplicateInstagramHandleIds = new Set(),
+  toonbtiAssignedArtistIds = new Set(),
   statsByArtistId,
   statsPeriod,
   onEdit,
@@ -247,7 +254,12 @@ export function ArtistTable({
                           />
                         </div>
 
-                        <div><DataBadges artist={artist} /></div>
+                        <div>
+                          <DataBadges
+                            artist={artist}
+                            hasToonbti={toonbtiAssignedArtistIds.has(artist.id)}
+                          />
+                        </div>
 
                         <div className="text-xs">
                           <p className="font-bold text-slate-700">{formatNumber(statsTotal)}</p>
